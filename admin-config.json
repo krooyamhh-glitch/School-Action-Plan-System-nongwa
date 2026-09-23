@@ -1,0 +1,9 @@
+{
+  "username": "superadmin",
+  "password": "password123",
+  "name": "ผู้ดูแลระบบสูงสุด (Super Admin)",
+  "position": "ผู้ดูแลระบบสูงสุด",
+  "phone": "0812345678",
+  "email": "superadmin@school.ac.th",
+  "has_custom_password": false
+}

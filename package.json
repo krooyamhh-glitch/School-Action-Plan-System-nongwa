@@ -1,0 +1,12 @@
+{
+  "name": "school-action-plan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ระบบบริหารแผนปฏิบัติการประจำปีของโรงเรียน (Pure PHP Application)",
+  "scripts": {
+    "dev": "service mariadb status >/dev/null 2>&1 || /etc/init.d/mariadb start >/dev/null 2>&1; php -S 0.0.0.0:3000 router.php",
+    "start": "service mariadb status >/dev/null 2>&1 || /etc/init.d/mariadb start >/dev/null 2>&1; php -S 0.0.0.0:3000 router.php",
+    "build": "echo 'Pure PHP application ready'",
+    "lint": "php -l index.php && php -l dashboard.php && php -l router.php"
+  }
+}

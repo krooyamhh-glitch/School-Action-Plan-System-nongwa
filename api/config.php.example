@@ -1,0 +1,19 @@
+<?php
+// การตั้งค่าฐานข้อมูล MySQL สำหรับ Plesk (ไฟล์ตัวอย่าง)
+// กรุณาคัดลอกไฟล์นี้เป็น config.php และแก้ไขข้อมูลให้ถูกต้อง
+$host = 'localhost';
+$user = 'YOUR_DB_USER';
+$pass = 'YOUR_DB_PASS';
+$db   = 'YOUR_DB_NAME';
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+} catch (PDOException $e) {
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]);
+    exit;
+}
+?>
