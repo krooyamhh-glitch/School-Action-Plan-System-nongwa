@@ -65,11 +65,12 @@ CREATE TABLE IF NOT EXISTS `student_subsidies` (
   `level_key` ENUM('kindergarten', 'primary', 'lower_secondary', 'upper_secondary') NOT NULL,
   `level_name` VARCHAR(100) NOT NULL, -- เช่น ก่อนประถมศึกษา (อนุบาล), ประถมศึกษา, มัธยมศึกษาตอนต้น, มัธยมศึกษาตอนปลาย
   `student_count` INT NOT NULL DEFAULT 0,
-  `subsidy_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00, -- อัตราเงินอุดหนุนรายหัว (บาท/คน/ปี)
+  `subsidy_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00, -- อัตราเงินอุดหนุนรายหัวปกติ (บาท/คน/ปี)
+  `small_school_subsidy` DECIMAL(10,2) NOT NULL DEFAULT 0.00, -- เงินเพิ่มโรงเรียนขนาดเล็ก (เด็ก < 120 คน เพิ่ม 500 บ./คน หรือป้อนตามจริง)
   `dev_rate` DECIMAL(10,2) NOT NULL DEFAULT 0.00, -- อัตราเงินกิจกรรมพัฒนาคุณภาพผู้เรียน กพพ. (บาท/คน/ปี)
-  `total_subsidy_amount` DECIMAL(14,2) GENERATED ALWAYS AS (`student_count` * `subsidy_rate`) STORED,
-  `total_dev_amount` DECIMAL(14,2) GENERATED ALWAYS AS (`student_count` * `dev_rate`) STORED,
-  `total_amount` DECIMAL(14,2) GENERATED ALWAYS AS ((`student_count` * `subsidy_rate`) + (`student_count` * `dev_rate`)) STORED,
+  `total_subsidy_amount` DECIMAL(14,2) DEFAULT 0.00,
+  `total_dev_amount` DECIMAL(14,2) DEFAULT 0.00,
+  `total_amount` DECIMAL(14,2) DEFAULT 0.00,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`school_id`) REFERENCES `schools`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`fiscal_year_id`) REFERENCES `fiscal_years`(`id`) ON DELETE CASCADE
@@ -84,6 +85,10 @@ CREATE TABLE IF NOT EXISTS `fiscal_years` (
   `end_date` DATE NOT NULL,
   `is_current` TINYINT(1) DEFAULT 0,
   `status` ENUM('planning', 'active', 'closed') DEFAULT 'active', -- planning=เปิดรับคำขอ, active=กำลังดำเนินงานตามแผน, closed=ปิดงบสิ้นปี
+  `total_budget_base` DECIMAL(14,2) NOT NULL DEFAULT 0.00, -- งบประมาณรวมที่ตั้งไว้จัดสรร (จากคำนวณรายหัวหรือกำหนดยอดเอง)
+  `utility_reserve` DECIMAL(14,2) NOT NULL DEFAULT 0.00, -- งบประมาณกันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ-ค่าไฟ)
+  `utility_reserve_notes` VARCHAR(255) DEFAULT 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)',
+  `allocatable_budget` DECIMAL(14,2) NOT NULL DEFAULT 0.00, -- ยอดงบสุทธิที่นำมาจัดสรร 5 ช่อง 100%
   `notes` TEXT,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

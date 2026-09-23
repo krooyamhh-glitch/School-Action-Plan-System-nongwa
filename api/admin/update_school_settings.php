@@ -1,14 +1,16 @@
 <?php
 session_start();
-require_once '../config.php';
+require_once __DIR__ . '/../config.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'] ?? '', ['admin', 'superadmin'])) {
     http_response_code(403);
     echo json_encode(['error' => 'ไม่มีสิทธิ์เข้าถึงส่วนนี้']);
     exit;
 }
+
+$schoolId = !empty($_SESSION['school_id']) ? (int)$_SESSION['school_id'] : 1;
 
 $data = json_decode(file_get_contents('php://input'), true);
 $name = $data['name'] ?? '';
@@ -44,7 +46,7 @@ try {
     }
 
     $stmt = $pdo->prepare('UPDATE schools SET name = ?, affiliation = ?, district = ?, province = ?, logo_url = ?, garuda_url = ?, director_name = ?, academic_head_name = ?, academic_head_position = ?, telegram_bot_token = ?, show_grades = ? WHERE id = ?');
-    $stmt->execute([$name, $affiliation, $district, $province, $logo_url, $garuda_url, $director_name, $academic_head_name, $academic_head_position, $telegram_bot_token, $show_grades, $_SESSION['school_id']]);
+    $stmt->execute([$name, $affiliation, $district, $province, $logo_url, $garuda_url, $director_name, $academic_head_name, $academic_head_position, $telegram_bot_token, $show_grades, $schoolId]);
 
     // Update session school name
     $_SESSION['school_name'] = $name;

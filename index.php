@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบบริหารแผนปฏิบัติการประจำปี - School Action Plan Management System</title>
-    <meta name="description" content="ระบบบริหารแผนปฏิบัติการประจำปีและงบประมาณสถานศึกษา รองรับการกำหนดปีงบประมาณ การจัดสรร 4 กลุ่มงาน เสนอโครงการ กลั่นกรอง อนุมัติ ติดตามผล เบิกจ่ายจริง และจัดทำรูปเล่มแผนปฏิบัติการ">
+    <meta name="description" content="ระบบบริหารแผนปฏิบัติการประจำปีและงบประมาณสถานศึกษา รองรับการจัดสรร 5 ช่องงาน เงินเพิ่มโรงเรียนขนาดเล็ก และการกันงบสาธารณูปโภค">
     <meta property="og:title" content="ระบบบริหารแผนปฏิบัติการประจำปี">
-    <meta property="og:description" content="ระบบบริหารแผนปฏิบัติการประจำปีและงบประมาณสถานศึกษา">
+    <meta property="og:description" content="ระบบบริหารแผนปฏิบัติการประจำปีและงบประมาณสถานศึกษา รองรับการจัดสรร 5 ช่องงาน เงินเพิ่มโรงเรียนขนาดเล็ก และการกันงบสาธารณูปโภค">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>

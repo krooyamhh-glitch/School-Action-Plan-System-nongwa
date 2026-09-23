@@ -92,6 +92,12 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Direct Logout Button in Header -->
+                <button onclick="logout()" title="ออกจากระบบ" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl border border-red-200 transition">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5 text-red-600"></i>
+                    <span class="hidden md:inline">ออกจากระบบ</span>
+                </button>
             </div>
         </div>
     </header>
@@ -123,7 +129,7 @@
 
                     <button onclick="switchTab('allocation')" id="tab-allocation" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition text-left">
                         <i data-lucide="pie-chart" class="w-4 h-4"></i>
-                        <span>3. จัดสรร 100% (4 กลุ่มงาน)</span>
+                        <span>3. จัดสรร 100% (5 ช่อง & สาธารณูปโภค)</span>
                     </button>
 
                     <button onclick="switchTab('projects')" id="tab-projects" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition text-left">
@@ -190,6 +196,14 @@
                     </p>
                     <button onclick="openNewProjectModalWithAI()" class="mt-2.5 w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition">
                         ทดลองใช้ AI ร่างโครงการ
+                    </button>
+                </div>
+
+                <!-- Direct Logout Button in Sidebar -->
+                <div class="mt-3 pt-3 border-t border-slate-100">
+                    <button onclick="logout()" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 transition text-left">
+                        <i data-lucide="log-out" class="w-4 h-4 text-red-500"></i>
+                        <span>ออกจากระบบ (Logout)</span>
                     </button>
                 </div>
             </div>
@@ -387,33 +401,154 @@
 
             <!-- View 3: 100% Department Allocation -->
             <div id="view-allocation" class="tab-view hidden space-y-6">
+                <!-- Header -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h2 class="text-lg font-bold text-slate-900">จัดสรรงบประมาณเป็นเปอร์เซ็นต์ (รวม 100%)</h2>
-                        <p class="text-xs text-slate-500">แบ่งให้ 4 กลุ่มงาน (วิชาการ, งบประมาณ, บุคคล, ทั่วไป) และงบสำรองจ่าย/ส่วนกลาง</p>
+                        <div class="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-full text-xs font-bold mb-2">
+                            <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-blue-600"></i>
+                            ระบบจัดสรรงบประมาณ 5 ช่อง & กันงบสาธารณูปโภค
+                        </div>
+                        <h2 class="text-xl font-bold text-slate-900">จัดสรรงบประมาณเป็นเปอร์เซ็นต์ (รวม 100%) และคำนวณเงิน</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            เลือกนำยอดเงินจากการคำนวณรายหัวหรือใส่ยอดเอง หักกันงบสาธารณูปโภค (ค่าน้ำ ค่าไฟ) แล้วจัดสรร 100% เข้า 5 ช่องงาน
+                        </p>
                     </div>
-                    <button onclick="saveAllocations()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5">
-                        <i data-lucide="save" class="w-4 h-4"></i> บันทึกสัดส่วนการจัดสรร
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="loadAllocationData()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition flex items-center gap-1.5">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> รีเฟรช
+                        </button>
+                        <button type="button" onclick="saveAllocations()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-600/20 transition flex items-center gap-2">
+                            <i data-lucide="save" class="w-4 h-4"></i> บันทึกการจัดสรรงบประมาณ
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Total Percentage Status Banner -->
-                <div id="percentValidationBanner" class="p-4 rounded-2xl border flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div id="percentIcon" class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm"></div>
+                <!-- Section 1: Budget Base Source & Utility Reserve -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                         <div>
-                            <p class="text-xs font-bold" id="percentStatusTitle">สถานะสัดส่วนรวม</p>
-                            <p class="text-xs" id="percentStatusDesc">ผลรวมเปอร์เซ็นต์ต้องได้ 100.00% พอดี</p>
+                            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">1</span>
+                                แหล่งที่มาของยอดงบประมาณรวม และการกันงบสาธารณูปโภค
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                เลือกว่าจะนำเงินที่คำนวณจากเงินอุดหนุนรายหัว+กพพ. มาใช้ หรือต้องการป้อนยอดเงินงบประมาณเอง
+                            </p>
+                        </div>
+                        <!-- Radio selection for budget source -->
+                        <div class="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-200 text-xs">
+                            <label class="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg transition font-medium has-checked:bg-white has-checked:text-blue-700 has-checked:shadow-xs has-checked:font-bold">
+                                <input type="radio" name="alloc_budget_source_type" id="src_calc" value="calc" onchange="onBudgetSourceTypeChange()" checked class="text-blue-600 focus:ring-0">
+                                <span>นำเงินที่ได้จากการคำนวณ</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg transition font-medium has-checked:bg-white has-checked:text-blue-700 has-checked:shadow-xs has-checked:font-bold">
+                                <input type="radio" name="alloc_budget_source_type" id="src_custom" value="custom" onchange="onBudgetSourceTypeChange()" class="text-blue-600 focus:ring-0">
+                                <span>ใส่ยอดเงินงบประมาณเอง</span>
+                            </label>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <span class="text-2xl font-black" id="percentTotalBadge">100.00%</span>
+
+                    <!-- 3 Financial Formula Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Card A: Total Budget Base -->
+                        <div class="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-slate-600">ยอดงบประมาณรวมทั้งหมด (ก)</span>
+                                <span id="budgetSourceBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700">จากยอดคำนวณ</span>
+                            </div>
+                            <div class="relative mt-2">
+                                <input type="number" id="allocTotalBudgetInput" min="0" step="100" oninput="onBudgetBaseChanged()"
+                                       class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-base font-extrabold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10">
+                                <span class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">บาท</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-2" id="allocCalcReferenceText">
+                                ยอดจากการคำนวณรายหัว & กพพ.: 0.00 บาท
+                            </p>
+                        </div>
+
+                        <!-- Card B: Utility Reserve -->
+                        <div class="bg-amber-50/60 p-4 rounded-2xl border border-amber-200/80">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-600"></i>
+                                    หัก: กันค่าสาธารณูปโภค (ข)
+                                </span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-200 text-amber-800">ค่าน้ำ - ค่าไฟ</span>
+                            </div>
+                            <div class="relative mt-2">
+                                <input type="number" id="allocUtilityReserveInput" min="0" step="100" value="0" oninput="onBudgetBaseChanged()"
+                                       placeholder="0.00" class="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-base font-extrabold text-amber-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10">
+                                <span class="absolute right-3 top-2.5 text-xs font-bold text-amber-600">บาท</span>
+                            </div>
+                            <input type="text" id="allocUtilityNotesInput" placeholder="หมายเหตุ เช่น ค่าน้ำ ค่าไฟ ค่าโทรศัพท์ ค่าอินเทอร์เน็ต..." 
+                                   class="w-full mt-2 px-2.5 py-1.5 bg-white border border-amber-200 rounded-lg text-[11px] text-slate-700 outline-none focus:border-amber-400">
+                        </div>
+
+                        <!-- Card C: Allocatable Budget (Net 100%) -->
+                        <div class="bg-gradient-to-br from-blue-900 to-indigo-950 p-4 rounded-2xl text-white shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-xs font-bold text-blue-200 uppercase tracking-wider">งบสุทธิที่จะนำมาจัดสรร 100% (ก - ข)</span>
+                                    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+                                </div>
+                                <p class="text-2xl font-black text-white mt-1" id="allocatableBudgetDisplay">0.00 ฿</p>
+                            </div>
+                            <div class="pt-2 border-t border-white/10 text-[11px] text-blue-200 flex justify-between items-center">
+                                <span>จัดสรรให้ 5 ช่องงาน</span>
+                                <span class="font-bold text-emerald-300" id="allocatedSumNotice">รวม 100.00%</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Allocation Form Cards for the 4 departments + reserve -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="allocationCardsContainer">
-                    <!-- Populated dynamically -->
+                <!-- Section 2: Preset Ratio Shortcuts & Total Percentage Status Banner -->
+                <div class="space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-700">สัดส่วนมาตรฐานรวดเร็ว:</span>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button type="button" onclick="applyPresetAllocation('standard')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs">
+                                    สพฐ. มาตรฐาน (45-10-10-20-15)
+                                </button>
+                                <button type="button" onclick="applyPresetAllocation('academic')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs">
+                                    เน้นวิชาการ (55-10-5-15-15)
+                                </button>
+                                <button type="button" onclick="applyPresetAllocation('equal')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs">
+                                    หารเท่ากัน 5 ช่อง (20% ทุกช่อง)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total Percentage Status Banner -->
+                    <div id="percentValidationBanner" class="p-4 rounded-2xl border flex items-center justify-between transition-all">
+                        <div class="flex items-center gap-3">
+                            <div id="percentIcon" class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm"></div>
+                            <div>
+                                <p class="text-xs font-bold" id="percentStatusTitle">สถานะสัดส่วนรวม</p>
+                                <p class="text-xs" id="percentStatusDesc">ผลรวมเปอร์เซ็นต์ต้องได้ 100.00% พอดี</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-2xl font-black" id="percentTotalBadge">100.00%</span>
+                            <p class="text-[11px] font-bold" id="percentTotalAmountBadge">0.00 บาท</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Allocation Form Cards for 5 Categories (4 Departments + Other Expenses) -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">2</span>
+                            จัดสรรงบประมาณ 5 ช่องงาน (กรอกร้อยละหรือจำนวนเงิน ระบบจะคำนวณสลับให้อัตโนมัติ)
+                        </h3>
+                        <span class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">5 ช่องงาน</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="allocationCardsContainer">
+                        <!-- Populated dynamically with 5 departments -->
+                    </div>
                 </div>
             </div>
 
@@ -753,7 +888,7 @@
                         </div>
                         <h2 class="text-xl font-bold text-slate-900">คำนวณงบประมาณเงินอุดหนุนรายหัวและเงินกิจกรรมพัฒนาผู้เรียน (กพพ.)</h2>
                         <p class="text-xs text-slate-500 mt-0.5">
-                            กำหนดจำนวนนักเรียนในแต่ละช่วงชั้น เพื่อนำอัตราที่รัฐบาลจัดสรรมาคูณคำนวณยอดเงินงบประมาณ และนำไปตัดงบจัดสรร 100% เข้า 4 กลุ่มงาน
+                            กำหนดจำนวนนักเรียนในแต่ละช่วงชั้น พร้อมคอลัมน์เงินเพิ่มโรงเรียนขนาดเล็ก (เด็กต่ำกว่า 120 คน เพิ่ม 500 บ./คน หรือป้อนตามจริง) เพื่อนำไปตัดงบจัดสรร 100%
                         </p>
                     </div>
                     <div class="flex gap-2">
@@ -761,73 +896,111 @@
                             <i data-lucide="save" class="w-4 h-4"></i> บันทึกข้อมูลนักเรียน
                         </button>
                         <button type="button" onclick="applySubsidiesToBudget()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-emerald-600/20 flex items-center gap-2">
-                            <i data-lucide="arrow-right-circle" class="w-4 h-4"></i> ตัดงบเข้า 4 กลุ่มงาน 100%
+                            <i data-lucide="arrow-right-circle" class="w-4 h-4"></i> ตัดงบเข้า 5 ช่อง 100%
                         </button>
                     </div>
                 </div>
 
-                <!-- Subsidies Summary KPI Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">จำนวนนักเรียนทั้งหมด</span>
-                            <div class="p-2 rounded-xl bg-blue-50 text-blue-600"><i data-lucide="users" class="w-5 h-5"></i></div>
+                <!-- Small School Banner (Auto detects < 120 students or manually controlled) -->
+                <div id="smallSchoolBanner" class="p-4 bg-amber-50/90 border border-amber-200 text-amber-900 rounded-2xl text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                    <div class="flex items-start sm:items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-amber-200 text-amber-900 flex items-center justify-center font-bold shrink-0">
+                            <i data-lucide="school" class="w-5 h-5"></i>
                         </div>
-                        <p class="text-2xl font-extrabold text-slate-900 mt-2" id="sub-kpi-students">0 คน</p>
-                        <p class="text-xs text-slate-500 mt-1">4 ช่วงชั้น (อนุบาล - ม.ปลาย)</p>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-slate-900 text-sm" id="smallSchoolBannerTitle">เกณฑ์โรงเรียนขนาดเล็ก (นักเรียนต่ำกว่า 120 คน)</span>
+                                <span id="smallSchoolBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-800">รร.ขนาดเล็ก</span>
+                            </div>
+                            <p class="text-slate-600 text-xs mt-0.5" id="smallSchoolBannerDesc">
+                                โรงเรียนขนาดเล็กที่เด็กต่ำกว่า 120 คน จะได้รับเงินเพิ่มรายหัว 500 บาทต่อคน/ปี (แต่ไม่ได้แน่นอนเสมอไป สามารถป้อนหรือปรับแก้จำนวนเงินเพิ่มในคอลัมน์ด้านล่างได้)
+                            </p>
+                        </div>
                     </div>
-
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">เงินอุดหนุนรายหัวรวม</span>
-                            <div class="p-2 rounded-xl bg-emerald-50 text-emerald-600"><i data-lucide="wallet" class="w-5 h-5"></i></div>
-                        </div>
-                        <p class="text-2xl font-extrabold text-emerald-600 mt-2" id="sub-kpi-subsidy-total">0.00 ฿</p>
-                        <p class="text-xs text-slate-500 mt-1">การจัดการศึกษาขั้นพื้นฐาน</p>
-                    </div>
-
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">เงินกิจกรรมพัฒนาผู้เรียน (กพพ.)</span>
-                            <div class="p-2 rounded-xl bg-purple-50 text-purple-600"><i data-lucide="sparkles" class="w-5 h-5"></i></div>
-                        </div>
-                        <p class="text-2xl font-extrabold text-purple-600 mt-2" id="sub-kpi-dev-total">0.00 ฿</p>
-                        <p class="text-xs text-slate-500 mt-1">4 กิจกรรมพัฒนาคุณภาพผู้เรียน</p>
-                    </div>
-
-                    <div class="bg-gradient-to-br from-blue-900 to-indigo-950 p-5 rounded-2xl text-white shadow-md">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-blue-200 uppercase tracking-wider">รวมยอดงบประมาณที่ได้</span>
-                            <div class="p-2 rounded-xl bg-white/10 text-white"><i data-lucide="check-check" class="w-5 h-5"></i></div>
-                        </div>
-                        <p class="text-2xl font-extrabold text-white mt-2" id="sub-kpi-grand-total">0.00 ฿</p>
-                        <p class="text-xs text-blue-200 mt-1">พร้อมนำไปจัดสรรร้อยละ 100%</p>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" onclick="setSmallSchoolRatePreset(500)" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs">
+                            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> ตั้งเงินเพิ่ม 500 บ./คน ทุกชั้น
+                        </button>
+                        <button type="button" onclick="setSmallSchoolRatePreset(0)" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition">
+                            ล้างเป็น 0
+                        </button>
                     </div>
                 </div>
 
-                <!-- Interactive Rates and Students Count Table -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">ตารางกำหนดจำนวนนักเรียนและอัตราเงินอุดหนุนต่อหัว (พ.ศ. 2568)</h3>
-                            <p class="text-xs text-slate-500 mt-0.5">แก้ไขจำนวนนักเรียนหรืออัตราตามหนังสือจัดสรร แล้วระบบจะคำนวณยอดเงินให้อัตโนมัติ</p>
+                <!-- Subsidies Summary KPI Cards (5 Cards) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">จำนวนนักเรียนรวม</span>
+                            <div class="p-1.5 rounded-xl bg-blue-50 text-blue-600"><i data-lucide="users" class="w-4 h-4"></i></div>
                         </div>
-                        <span class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">
-                            เกณฑ์อัตรา สพฐ. กระทรวงศึกษาธิการ
-                        </span>
+                        <p class="text-xl font-extrabold text-slate-900 mt-2" id="sub-kpi-students">0 คน</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5" id="sub-kpi-school-size">ตรวจจับสถานะ รร.</p>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">เงินอุดหนุนปกติ</span>
+                            <div class="p-1.5 rounded-xl bg-emerald-50 text-emerald-600"><i data-lucide="wallet" class="w-4 h-4"></i></div>
+                        </div>
+                        <p class="text-xl font-extrabold text-emerald-600 mt-2" id="sub-kpi-subsidy-total">0.00 ฿</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5">เงินอุดหนุนรายหัวเกณฑ์ปกติ</p>
+                    </div>
+
+                    <div class="bg-amber-50/60 p-4 rounded-2xl border border-amber-200 shadow-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider">เงินเพิ่ม รร.ขนาดเล็ก</span>
+                            <div class="p-1.5 rounded-xl bg-amber-100 text-amber-700"><i data-lucide="plus-circle" class="w-4 h-4"></i></div>
+                        </div>
+                        <p class="text-xl font-extrabold text-amber-700 mt-2" id="sub-kpi-small-total">0.00 ฿</p>
+                        <p class="text-[11px] text-amber-700/80 mt-0.5">เงินเพิ่มเด็ก &lt; 120 คน</p>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">เงิน กพพ. (4 กิจกรรม)</span>
+                            <div class="p-1.5 rounded-xl bg-purple-50 text-purple-600"><i data-lucide="sparkles" class="w-4 h-4"></i></div>
+                        </div>
+                        <p class="text-xl font-extrabold text-purple-600 mt-2" id="sub-kpi-dev-total">0.00 ฿</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5">พัฒนาคุณภาพผู้เรียน</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-blue-900 to-indigo-950 p-4 rounded-2xl text-white shadow-md">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-blue-200 uppercase tracking-wider">รวมยอดงบทั้งหมด</span>
+                            <div class="p-1.5 rounded-xl bg-white/10 text-white"><i data-lucide="check-check" class="w-4 h-4"></i></div>
+                        </div>
+                        <p class="text-xl font-extrabold text-white mt-2" id="sub-kpi-grand-total">0.00 ฿</p>
+                        <p class="text-[11px] text-blue-200 mt-0.5">พร้อมตัดเข้า 5 ช่อง 100%</p>
+                    </div>
+                </div>
+
+                <!-- Interactive Rates and Students Count Table (With Small School Subsidy Column) -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">ตารางกำหนดจำนวนนักเรียน อัตราเงินอุดหนุนต่อหัว และเงินเพิ่มโรงเรียนขนาดเล็ก</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">ป้อนจำนวนนักเรียน อัตราปกติ หรือเงินเพิ่มโรงเรียนขนาดเล็กตามหนังสือจัดสรร ระบบจะคำนวณงบประมาณให้อัตโนมัติ</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg">
+                                เกณฑ์อัตรา สพฐ. ศธ.
+                            </span>
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs border-collapse">
                             <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
                                 <tr>
-                                    <th class="p-3 w-40">ระดับช่วงชั้น</th>
-                                    <th class="p-3 w-28 text-center">จำนวนนักเรียน (คน)</th>
-                                    <th class="p-3 w-32 text-right">เงินอุดหนุนรายหัว (บ./คน/ปี)</th>
-                                    <th class="p-3 w-36 text-right">รวมเงินอุดหนุน (บาท)</th>
-                                    <th class="p-3 w-32 text-right">เงิน กพพ. (บ./คน/ปี)</th>
-                                    <th class="p-3 w-36 text-right">รวมเงิน กพพ. (บาท)</th>
-                                    <th class="p-3 w-40 text-right bg-slate-100/60">รวมงบทั้งสิ้น (บาท)</th>
+                                    <th class="p-3 w-36">ระดับช่วงชั้น</th>
+                                    <th class="p-3 w-24 text-center">จำนวน นร. (คน)</th>
+                                    <th class="p-3 w-28 text-right">เงินอุดหนุนปกติ (บ./คน/ปี)</th>
+                                    <th class="p-3 w-32 text-right bg-amber-50/70 text-amber-900">เงินเพิ่ม รร.เล็ก (บ./คน/ปี)</th>
+                                    <th class="p-3 w-32 text-right">รวมเงินอุดหนุน (บาท)</th>
+                                    <th class="p-3 w-28 text-right">เงิน กพพ. (บ./คน/ปี)</th>
+                                    <th class="p-3 w-32 text-right">รวมเงิน กพพ. (บาท)</th>
+                                    <th class="p-3 w-36 text-right bg-slate-100/70">รวมงบทั้งสิ้น (บาท)</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -835,103 +1008,120 @@
                                 <tr class="hover:bg-slate-50/70 transition">
                                     <td class="p-3 font-bold text-slate-900 flex items-center gap-2">
                                         <span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span>
-                                        ระดับก่อนประถม (อนุบาล)
+                                        ก่อนประถม (อนุบาล)
                                     </td>
                                     <td class="p-3 text-center">
-                                        <input type="number" id="sub_count_kindergarten" value="120" min="0" oninput="recalcSubsidiesLocal()" 
-                                               class="w-20 text-center font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                        <input type="number" id="sub_count_kindergarten" value="25" min="0" oninput="recalcSubsidiesLocal()" 
+                                               class="w-18 text-center font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
                                     <td class="p-3 text-right">
                                         <input type="number" id="sub_rate_kindergarten" value="1800" min="0" step="10" oninput="recalcSubsidiesLocal()" 
-                                               class="w-24 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                               class="w-20 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
-                                    <td class="p-3 text-right font-bold text-emerald-700" id="sub_total_subsidy_kindergarten">216,000.00</td>
+                                    <td class="p-3 text-right bg-amber-50/40">
+                                        <input type="number" id="sub_small_rate_kindergarten" value="500" min="0" step="50" oninput="recalcSubsidiesLocal()" 
+                                               placeholder="500" class="w-20 text-right font-bold text-amber-800 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs outline-none focus:bg-white focus:border-amber-500">
+                                    </td>
+                                    <td class="p-3 text-right font-bold text-emerald-700" id="sub_total_subsidy_kindergarten">57,500.00</td>
                                     <td class="p-3 text-right">
                                         <input type="number" id="sub_dev_rate_kindergarten" value="430" min="0" step="10" oninput="recalcSubsidiesLocal()" 
-                                               class="w-24 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                               class="w-20 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
-                                    <td class="p-3 text-right font-bold text-purple-700" id="sub_total_dev_kindergarten">51,600.00</td>
-                                    <td class="p-3 text-right font-black text-slate-900 bg-slate-50/50" id="sub_grand_kindergarten">267,600.00</td>
+                                    <td class="p-3 text-right font-bold text-purple-700" id="sub_total_dev_kindergarten">10,750.00</td>
+                                    <td class="p-3 text-right font-black text-slate-900 bg-slate-50/50" id="sub_grand_kindergarten">68,250.00</td>
                                 </tr>
 
                                 <!-- Primary -->
                                 <tr class="hover:bg-slate-50/70 transition">
                                     <td class="p-3 font-bold text-slate-900 flex items-center gap-2">
                                         <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                                        ระดับประถมศึกษา (ป.1 - ป.6)
+                                        ประถมศึกษา (ป.1 - ป.6)
                                     </td>
                                     <td class="p-3 text-center">
-                                        <input type="number" id="sub_count_primary" value="380" min="0" oninput="recalcSubsidiesLocal()" 
-                                               class="w-20 text-center font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                        <input type="number" id="sub_count_primary" value="55" min="0" oninput="recalcSubsidiesLocal()" 
+                                               class="w-18 text-center font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
                                     <td class="p-3 text-right">
                                         <input type="number" id="sub_rate_primary" value="2000" min="0" step="10" oninput="recalcSubsidiesLocal()" 
-                                               class="w-24 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                               class="w-20 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
-                                    <td class="p-3 text-right font-bold text-emerald-700" id="sub_total_subsidy_primary">760,000.00</td>
+                                    <td class="p-3 text-right bg-amber-50/40">
+                                        <input type="number" id="sub_small_rate_primary" value="500" min="0" step="50" oninput="recalcSubsidiesLocal()" 
+                                               placeholder="500" class="w-20 text-right font-bold text-amber-800 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs outline-none focus:bg-white focus:border-amber-500">
+                                    </td>
+                                    <td class="p-3 text-right font-bold text-emerald-700" id="sub_total_subsidy_primary">137,500.00</td>
                                     <td class="p-3 text-right">
                                         <input type="number" id="sub_dev_rate_primary" value="490" min="0" step="10" oninput="recalcSubsidiesLocal()" 
-                                               class="w-24 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                               class="w-20 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
-                                    <td class="p-3 text-right font-bold text-purple-700" id="sub_total_dev_primary">186,200.00</td>
-                                    <td class="p-3 text-right font-black text-slate-900 bg-slate-50/50" id="sub_grand_primary">946,200.00</td>
+                                    <td class="p-3 text-right font-bold text-purple-700" id="sub_total_dev_primary">26,950.00</td>
+                                    <td class="p-3 text-right font-black text-slate-900 bg-slate-50/50" id="sub_grand_primary">164,450.00</td>
                                 </tr>
 
                                 <!-- Lower Secondary -->
                                 <tr class="hover:bg-slate-50/70 transition">
                                     <td class="p-3 font-bold text-slate-900 flex items-center gap-2">
                                         <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                                        ระดับมัธยมศึกษาตอนต้น (ม.1 - ม.3)
+                                        มัธยมศึกษาตอนต้น (ม.1 - ม.3)
                                     </td>
                                     <td class="p-3 text-center">
-                                        <input type="number" id="sub_count_lower_secondary" value="220" min="0" oninput="recalcSubsidiesLocal()" 
-                                               class="w-20 text-center font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                        <input type="number" id="sub_count_lower_secondary" value="20" min="0" oninput="recalcSubsidiesLocal()" 
+                                               class="w-18 text-center font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
                                     <td class="p-3 text-right">
                                         <input type="number" id="sub_rate_lower_secondary" value="3600" min="0" step="10" oninput="recalcSubsidiesLocal()" 
-                                               class="w-24 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                               class="w-20 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
-                                    <td class="p-3 text-right font-bold text-emerald-700" id="sub_total_subsidy_lower_secondary">792,000.00</td>
+                                    <td class="p-3 text-right bg-amber-50/40">
+                                        <input type="number" id="sub_small_rate_lower_secondary" value="500" min="0" step="50" oninput="recalcSubsidiesLocal()" 
+                                               placeholder="500" class="w-20 text-right font-bold text-amber-800 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs outline-none focus:bg-white focus:border-amber-500">
+                                    </td>
+                                    <td class="p-3 text-right font-bold text-emerald-700" id="sub_total_subsidy_lower_secondary">82,000.00</td>
                                     <td class="p-3 text-right">
                                         <input type="number" id="sub_dev_rate_lower_secondary" value="880" min="0" step="10" oninput="recalcSubsidiesLocal()" 
-                                               class="w-24 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                               class="w-20 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
-                                    <td class="p-3 text-right font-bold text-purple-700" id="sub_total_dev_lower_secondary">193,600.00</td>
-                                    <td class="p-3 text-right font-black text-slate-900 bg-slate-50/50" id="sub_grand_lower_secondary">985,600.00</td>
+                                    <td class="p-3 text-right font-bold text-purple-700" id="sub_total_dev_lower_secondary">17,600.00</td>
+                                    <td class="p-3 text-right font-black text-slate-900 bg-slate-50/50" id="sub_grand_lower_secondary">99,600.00</td>
                                 </tr>
 
                                 <!-- Upper Secondary -->
                                 <tr class="hover:bg-slate-50/70 transition">
                                     <td class="p-3 font-bold text-slate-900 flex items-center gap-2">
                                         <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                                        ระดับมัธยมศึกษาตอนปลาย (ม.4 - ม.6)
+                                        มัธยมศึกษาตอนปลาย (ม.4 - ม.6)
                                     </td>
                                     <td class="p-3 text-center">
-                                        <input type="number" id="sub_count_upper_secondary" value="130" min="0" oninput="recalcSubsidiesLocal()" 
-                                               class="w-20 text-center font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                        <input type="number" id="sub_count_upper_secondary" value="0" min="0" oninput="recalcSubsidiesLocal()" 
+                                               class="w-18 text-center font-bold px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
                                     <td class="p-3 text-right">
                                         <input type="number" id="sub_rate_upper_secondary" value="3900" min="0" step="10" oninput="recalcSubsidiesLocal()" 
-                                               class="w-24 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                               class="w-20 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
-                                    <td class="p-3 text-right font-bold text-emerald-700" id="sub_total_subsidy_upper_secondary">507,000.00</td>
+                                    <td class="p-3 text-right bg-amber-50/40">
+                                        <input type="number" id="sub_small_rate_upper_secondary" value="0" min="0" step="50" oninput="recalcSubsidiesLocal()" 
+                                               placeholder="0" class="w-20 text-right font-bold text-amber-800 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs outline-none focus:bg-white focus:border-amber-500">
+                                    </td>
+                                    <td class="p-3 text-right font-bold text-emerald-700" id="sub_total_subsidy_upper_secondary">0.00</td>
                                     <td class="p-3 text-right">
                                         <input type="number" id="sub_dev_rate_upper_secondary" value="950" min="0" step="10" oninput="recalcSubsidiesLocal()" 
-                                               class="w-24 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
+                                               class="w-20 text-right font-medium px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-500">
                                     </td>
-                                    <td class="p-3 text-right font-bold text-purple-700" id="sub_total_dev_upper_secondary">123,500.00</td>
-                                    <td class="p-3 text-right font-black text-slate-900 bg-slate-50/50" id="sub_grand_upper_secondary">630,500.00</td>
+                                    <td class="p-3 text-right font-bold text-purple-700" id="sub_total_dev_upper_secondary">0.00</td>
+                                    <td class="p-3 text-right font-black text-slate-900 bg-slate-50/50" id="sub_grand_upper_secondary">0.00</td>
                                 </tr>
                             </tbody>
                             <tfoot class="bg-slate-100 font-extrabold text-slate-900 border-t-2 border-slate-200">
                                 <tr>
-                                    <td class="p-3">รวมทั้งสิ้น (4 ช่วงชั้น)</td>
-                                    <td class="p-3 text-center text-blue-700 text-sm" id="sub_foot_count">850 คน</td>
+                                    <td class="p-3">รวมทั้งสิ้น (ทุกช่วงชั้น)</td>
+                                    <td class="p-3 text-center text-blue-700 text-sm" id="sub_foot_count">100 คน</td>
                                     <td class="p-3 text-right text-slate-400">-</td>
-                                    <td class="p-3 text-right text-emerald-800 text-sm" id="sub_foot_subsidy">2,275,000.00</td>
+                                    <td class="p-3 text-right text-amber-800 text-sm bg-amber-100/50" id="sub_foot_small_subsidy">50,000.00</td>
+                                    <td class="p-3 text-right text-emerald-800 text-sm" id="sub_foot_subsidy">277,000.00</td>
                                     <td class="p-3 text-right text-slate-400">-</td>
-                                    <td class="p-3 text-right text-purple-800 text-sm" id="sub_foot_dev">554,900.00</td>
-                                    <td class="p-3 text-right text-blue-950 text-base bg-blue-100/50" id="sub_foot_grand">2,829,900.00</td>
+                                    <td class="p-3 text-right text-purple-800 text-sm" id="sub_foot_dev">55,300.00</td>
+                                    <td class="p-3 text-right text-blue-950 text-base bg-blue-100/60" id="sub_foot_grand">332,300.00</td>
                                 </tr>
                             </tfoot>
                         </table>

@@ -88,12 +88,16 @@ try {
             end_date DATE NULL,
             status ENUM('active', 'planning', 'closed') DEFAULT 'active',
             is_current BOOLEAN DEFAULT FALSE,
+            total_budget_base DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+            utility_reserve DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
+            utility_reserve_notes VARCHAR(255) DEFAULT 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)',
+            allocatable_budget DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
     $steps[] = [
         "table" => "fiscal_years",
-        "details" => "ตารางปีงบประมาณ พ.ศ. (1 ต.ค. - 30 ก.ย.)"
+        "details" => "ตารางปีงบประมาณ พ.ศ. (พร้อมยอดงบรวม, งบกันค่าสาธารณูปโภค, งบสุทธิที่จัดสรร)"
     ];
 
     // 4. student_subsidies table
@@ -105,14 +109,22 @@ try {
             level_key VARCHAR(50) NOT NULL,
             level_name VARCHAR(100) NOT NULL,
             student_count INT DEFAULT 0,
+            subsidy_rate DECIMAL(12, 2) DEFAULT 0.00,
             per_head_subsidy DECIMAL(12, 2) DEFAULT 0.00,
+            small_school_subsidy DECIMAL(12, 2) DEFAULT 0.00,
+            dev_rate DECIMAL(12, 2) DEFAULT 0.00,
             per_head_dev DECIMAL(12, 2) DEFAULT 0.00,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            total_subsidy_amount DECIMAL(14, 2) DEFAULT 0.00,
+            total_dev_amount DECIMAL(14, 2) DEFAULT 0.00,
+            total_amount DECIMAL(14, 2) DEFAULT 0.00,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_year_level (fiscal_year_id, level_key)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
     $steps[] = [
         "table" => "student_subsidies",
-        "details" => "ตารางคำนวณเงินอุดหนุนรายหัวและเงินกิจกรรมพัฒนาผู้เรียน"
+        "details" => "ตารางคำนวณเงินอุดหนุนรายหัว (เพิ่มคอลัมน์เงินเพิ่มโรงเรียนขนาดเล็ก 500 บาท/คน) และเงิน กพพ."
     ];
 
     // 5. budget_sources table
@@ -139,16 +151,18 @@ try {
             id INT AUTO_INCREMENT PRIMARY KEY,
             school_id INT NOT NULL,
             fiscal_year_id INT NOT NULL,
-            department ENUM('academic', 'budget', 'personnel', 'general', 'central', 'reserve') NOT NULL,
+            department ENUM('academic', 'budget', 'personnel', 'general', 'central', 'reserve', 'other') NOT NULL,
             department_name VARCHAR(150) NULL,
             percentage DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
             allocated_amount DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            notes VARCHAR(255) DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_year_dept (fiscal_year_id, department)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
     $steps[] = [
         "table" => "department_allocations",
-        "details" => "ตารางจัดสรรงบประมาณ 4 กลุ่มงาน (วิชาการ, งบประมาณ, บุคคล, ทั่วไป)"
+        "details" => "ตารางจัดสรรงบประมาณ 5 ช่อง (วิชาการ, บุคคล, งบประมาณ, ทั่วไป, กันไว้สำหรับค่าใช้จ่ายอื่นๆ)"
     ];
 
     // 7. projects table
