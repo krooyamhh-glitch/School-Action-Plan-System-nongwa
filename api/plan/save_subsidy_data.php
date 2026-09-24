@@ -23,27 +23,54 @@ try {
     $fiscal_year_id = (int)($data['fiscal_year_id'] ?? 0);
     $rates = $data['rates'] ?? [];
 
-    if ($fiscal_year_id <= 0) {
-        // Check if there is an active fiscal year
-        $stmtY = $pdo->query("SELECT id FROM fiscal_years ORDER BY is_current DESC, id DESC LIMIT 1");
-        $rowY = $stmtY->fetch();
-        if ($rowY) {
-            $fiscal_year_id = (int)$rowY['id'];
+    // ตรวจสอบความถูกต้องของ fiscal_year_id และความสัมพันธ์ Foreign Key
+    $validYear = null;
+    if ($fiscal_year_id > 0) {
+        $stmtCheckFy = $pdo->prepare("SELECT id FROM `fiscal_years` WHERE id = ? LIMIT 1");
+        $stmtCheckFy->execute([$fiscal_year_id]);
+        $validYear = $stmtCheckFy->fetch();
+    }
+
+    if (!$validYear) {
+        // หาปีงบประมาณที่มีอยู่จริงในระบบ
+        $stmtY = $pdo->query("SELECT id FROM `fiscal_years` ORDER BY is_current DESC, id DESC LIMIT 1");
+        $validYear = $stmtY ? $stmtY->fetch() : null;
+        if ($validYear) {
+            $fiscal_year_id = (int)$validYear['id'];
         } else {
-            // Create default fiscal year 2568
-            $stmtCreateY = $pdo->prepare("
-                INSERT INTO fiscal_years (
-                    school_id, year, year_be, start_date, end_date, is_current, status,
-                    total_budget_base, utility_reserve, utility_reserve_notes, allocatable_budget
-                ) VALUES (
-                    1, '2568', 2568, '2024-10-01', '2025-09-30', 1, 'active',
-                    0.00, 0.00, 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)', 0.00
-                )
-            ");
-            $stmtCreateY->execute();
+            // สร้างปีงบประมาณเริ่มต้น พ.ศ. 2568
+            $fyCols = getTableColumns($pdo, 'fiscal_years');
+            $insCols = ["`start_date`", "`end_date`", "`is_current`", "`status`"];
+            $insPlaceholders = ["?", "?", "?", "?"];
+            $insVals = ['2024-10-01', '2025-09-30', 1, 'active'];
+
+            if (in_array('school_id', $fyCols)) {
+                $insCols[] = "`school_id`"; $insPlaceholders[] = "?"; $insVals[] = 1;
+            }
+            if (in_array('year', $fyCols)) {
+                $insCols[] = "`year`"; $insPlaceholders[] = "?"; $insVals[] = '2568';
+            }
+            if (in_array('year_be', $fyCols)) {
+                $insCols[] = "`year_be`"; $insPlaceholders[] = "?"; $insVals[] = 2568;
+            }
+
+            $sqlCreateY = "INSERT INTO `fiscal_years` (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $insPlaceholders) . ")";
+            $stmtCreateY = $pdo->prepare($sqlCreateY);
+            $stmtCreateY->execute($insVals);
             $fiscal_year_id = (int)$pdo->lastInsertId();
         }
     }
+
+    // ตรวจสอบโรงเรียน id=1 สำหรับ Foreign Key
+    try {
+        $schoolCols = getTableColumns($pdo, 'schools');
+        if (!empty($schoolCols)) {
+            $schoolCheck = $pdo->query("SELECT id FROM `schools` WHERE id = 1 LIMIT 1")->fetch();
+            if (!$schoolCheck) {
+                $pdo->exec("INSERT INTO `schools` (`id`, `smis_code`, `code`, `name`) VALUES (1, '10310001', '10310001', 'โรงเรียน')");
+            }
+        }
+    } catch (\Throwable $eSch) {}
 
     $levelNames = [
         'kindergarten' => 'ระดับก่อนประถมศึกษา (อนุบาล)',
@@ -51,6 +78,16 @@ try {
         'lower_secondary' => 'ระดับมัธยมศึกษาตอนต้น (ม.1 - ม.3)',
         'upper_secondary' => 'ระดับมัธยมศึกษาตอนปลาย (ม.4 - ม.6)'
     ];
+
+    $subCols = getTableColumns($pdo, 'student_subsidies');
+    $hasSchoolId = in_array('school_id', $subCols);
+    $hasPerHeadSubsidy = in_array('per_head_subsidy', $subCols);
+    $hasSmallSchool = in_array('small_school_subsidy', $subCols);
+    $hasDevRate = in_array('dev_rate', $subCols);
+    $hasPerHeadDev = in_array('per_head_dev', $subCols);
+    $hasTotalSubsidy = in_array('total_subsidy_amount', $subCols);
+    $hasTotalDev = in_array('total_dev_amount', $subCols);
+    $hasTotalAmount = in_array('total_amount', $subCols);
 
     $pdo->beginTransaction();
 
@@ -60,32 +97,7 @@ try {
     $totalDevAll = 0;
     $grandTotalBudget = 0;
 
-    $stmtFind = $pdo->prepare("SELECT id FROM student_subsidies WHERE fiscal_year_id = ? AND level_key = ? LIMIT 1");
-    $stmtUpdate = $pdo->prepare("
-        UPDATE student_subsidies SET
-            level_name = ?,
-            student_count = ?,
-            subsidy_rate = ?,
-            per_head_subsidy = ?,
-            small_school_subsidy = ?,
-            dev_rate = ?,
-            per_head_dev = ?,
-            total_subsidy_amount = ?,
-            total_dev_amount = ?,
-            total_amount = ?
-        WHERE id = ?
-    ");
-    $stmtInsert = $pdo->prepare("
-        INSERT INTO student_subsidies (
-            school_id, fiscal_year_id, level_key, level_name,
-            student_count, subsidy_rate, per_head_subsidy, small_school_subsidy,
-            dev_rate, per_head_dev, total_subsidy_amount, total_dev_amount, total_amount
-        ) VALUES (
-            1, ?, ?, ?,
-            ?, ?, ?, ?,
-            ?, ?, ?, ?, ?
-        )
-    ");
+    $stmtFind = $pdo->prepare("SELECT id FROM `student_subsidies` WHERE fiscal_year_id = ? AND level_key = ? LIMIT 1");
 
     foreach ($levelNames as $lvlKey => $lvlName) {
         $lvlData = $rates[$lvlKey] ?? [];
@@ -104,34 +116,44 @@ try {
         $existing = $stmtFind->fetch(PDO::FETCH_ASSOC);
 
         if ($existing) {
-            $stmtUpdate->execute([
-                $lvlName,
-                $count,
-                $subsidyRate,
-                $subsidyRate,
-                $smallRate,
-                $devRate,
-                $devRate,
-                $subTotal,
-                $devTotal,
-                $rowTotal,
-                $existing['id']
-            ]);
+            $upFields = [];
+            $upParams = [];
+
+            if (in_array('level_name', $subCols)) { $upFields[] = "`level_name` = ?"; $upParams[] = $lvlName; }
+            if (in_array('student_count', $subCols)) { $upFields[] = "`student_count` = ?"; $upParams[] = $count; }
+            if (in_array('subsidy_rate', $subCols)) { $upFields[] = "`subsidy_rate` = ?"; $upParams[] = $subsidyRate; }
+            if ($hasPerHeadSubsidy) { $upFields[] = "`per_head_subsidy` = ?"; $upParams[] = $subsidyRate; }
+            if ($hasSmallSchool) { $upFields[] = "`small_school_subsidy` = ?"; $upParams[] = $smallRate; }
+            if ($hasDevRate) { $upFields[] = "`dev_rate` = ?"; $upParams[] = $devRate; }
+            if ($hasPerHeadDev) { $upFields[] = "`per_head_dev` = ?"; $upParams[] = $devRate; }
+            if ($hasTotalSubsidy) { $upFields[] = "`total_subsidy_amount` = ?"; $upParams[] = $subTotal; }
+            if ($hasTotalDev) { $upFields[] = "`total_dev_amount` = ?"; $upParams[] = $devTotal; }
+            if ($hasTotalAmount) { $upFields[] = "`total_amount` = ?"; $upParams[] = $rowTotal; }
+
+            $upParams[] = $existing['id'];
+            $sqlUp = "UPDATE `student_subsidies` SET " . implode(', ', $upFields) . " WHERE id = ?";
+            $stmtUp = $pdo->prepare($sqlUp);
+            $stmtUp->execute($upParams);
         } else {
-            $stmtInsert->execute([
-                $fiscal_year_id,
-                $lvlKey,
-                $lvlName,
-                $count,
-                $subsidyRate,
-                $subsidyRate,
-                $smallRate,
-                $devRate,
-                $devRate,
-                $subTotal,
-                $devTotal,
-                $rowTotal
-            ]);
+            $inCols = ["`fiscal_year_id`", "`level_key`"];
+            $inParams = [$fiscal_year_id, $lvlKey];
+
+            if ($hasSchoolId) { $inCols[] = "`school_id`"; $inParams[] = 1; }
+            if (in_array('level_name', $subCols)) { $inCols[] = "`level_name`"; $inParams[] = $lvlName; }
+            if (in_array('student_count', $subCols)) { $inCols[] = "`student_count`"; $inParams[] = $count; }
+            if (in_array('subsidy_rate', $subCols)) { $inCols[] = "`subsidy_rate`"; $inParams[] = $subsidyRate; }
+            if ($hasPerHeadSubsidy) { $inCols[] = "`per_head_subsidy`"; $inParams[] = $subsidyRate; }
+            if ($hasSmallSchool) { $inCols[] = "`small_school_subsidy`"; $inParams[] = $smallRate; }
+            if ($hasDevRate) { $inCols[] = "`dev_rate`"; $inParams[] = $devRate; }
+            if ($hasPerHeadDev) { $inCols[] = "`per_head_dev`"; $inParams[] = $devRate; }
+            if ($hasTotalSubsidy) { $inCols[] = "`total_subsidy_amount`"; $inParams[] = $subTotal; }
+            if ($hasTotalDev) { $inCols[] = "`total_dev_amount`"; $inParams[] = $devTotal; }
+            if ($hasTotalAmount) { $inCols[] = "`total_amount`"; $inParams[] = $rowTotal; }
+
+            $placeholders = array_fill(0, count($inCols), '?');
+            $sqlIn = "INSERT INTO `student_subsidies` (" . implode(', ', $inCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            $stmtIn = $pdo->prepare($sqlIn);
+            $stmtIn->execute($inParams);
         }
 
         $totalStudentsAll += $count;
@@ -161,7 +183,6 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    http_response_code(500);
     echo json_encode([
         'status' => 'error',
         'message' => 'เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' . $e->getMessage()

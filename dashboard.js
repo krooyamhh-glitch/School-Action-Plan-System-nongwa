@@ -127,7 +127,16 @@ async function loadData(yearId = null) {
     try {
         const url = yearId ? `/api/plan/get_data.php?year_id=${yearId}` : `/api/plan/get_data.php`;
         const res = await fetch(url);
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (jsonErr) {
+            console.error('Server returned non-JSON:', text);
+            showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลจากเซิร์ฟเวอร์ (' + res.status + ')', 'error');
+            return;
+        }
+
         if (data.status === 'success') {
             appData = data;
             selectedYearId = data.currentFiscalYear?.id ? parseInt(data.currentFiscalYear.id) : (yearId || 1);
@@ -135,9 +144,11 @@ async function loadData(yearId = null) {
             renderAllViews();
         } else {
             console.error('Failed to load data:', data.message);
+            showToast(data.message || 'ไม่สามารถโหลดข้อมูลแผนปฏิบัติการได้', 'error');
         }
     } catch (err) {
         console.error('Network error loading plan data:', err);
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: ' + err.message, 'error');
     }
 }
 
@@ -2207,8 +2218,9 @@ function getSubsidyPayload() {
             student_dev_rate: parseFloat(document.getElementById(`sub_dev_rate_${lvl}`)?.value) || 0
         };
     });
+    const fyId = selectedYearId || appData?.currentFiscalYear?.id || (appData?.fiscalYears?.[0]?.id) || 0;
     return {
-        fiscal_year_id: selectedYearId,
+        fiscal_year_id: parseInt(fyId) || 0,
         rates: rates
     };
 }

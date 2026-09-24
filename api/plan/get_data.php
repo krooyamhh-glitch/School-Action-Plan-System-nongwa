@@ -2,8 +2,11 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../config.php';
 
-if (!$pdo) {
-    echo json_encode(['status' => 'error', 'message' => 'Database connection failed']);
+if (!($pdo instanceof PDO)) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้: ' . ($db_error ?: 'กรุณาตรวจสอบการตั้งค่าฐานข้อมูล MySQL')
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -88,61 +91,99 @@ try {
         $totalBudgetReceived += (float)$s['amount'];
     }
 
-    // คำนวณสรุปเงินอุดหนุนรายหัวจาก student_subsidies
-    $stmtSub = $pdo->prepare("
-        SELECT 
-            COALESCE(SUM(student_count), 0) as total_students,
-            COALESCE(SUM(student_count * subsidy_rate), 0) as normal_subsidy,
-            COALESCE(SUM(student_count * small_school_subsidy), 0) as small_school_subsidy,
-            COALESCE(SUM(total_subsidy_amount), 0) as total_subsidy,
-            COALESCE(SUM(total_dev_amount), 0) as total_dev,
-            COALESCE(SUM(total_amount), 0) as grand_total
-        FROM student_subsidies 
-        WHERE fiscal_year_id = ?
-    ");
-    $stmtSub->execute([$selectedYearId]);
-    $subSummary = $stmtSub->fetch(PDO::FETCH_ASSOC);
-    $calculatedSubsidyTotal = $subSummary ? (float)$subSummary['grand_total'] : 0.00;
+    // คำนวณสรุปเงินอุดหนุนรายหัวจาก student_subsidies อย่างปลอดภัย
+    $subSummary = null;
+    $calculatedSubsidyTotal = 0.00;
+    try {
+        $subCols = getTableColumns($pdo, 'student_subsidies');
+        $hasSmall = in_array('small_school_subsidy', $subCols);
+        $hasRate = in_array('subsidy_rate', $subCols);
+        $hasDev = in_array('dev_rate', $subCols);
+        $hasTotSub = in_array('total_subsidy_amount', $subCols);
+        $hasTotDev = in_array('total_dev_amount', $subCols);
+        $hasTotAll = in_array('total_amount', $subCols);
+
+        $smallSql = $hasSmall ? "COALESCE(SUM(student_count * small_school_subsidy), 0)" : "0";
+        $normSql = $hasRate ? "COALESCE(SUM(student_count * subsidy_rate), 0)" : "0";
+        $totSubSql = $hasTotSub ? "COALESCE(SUM(total_subsidy_amount), 0)" : $normSql;
+        $totDevSql = $hasTotDev ? "COALESCE(SUM(total_dev_amount), 0)" : ($hasDev ? "COALESCE(SUM(student_count * dev_rate), 0)" : "0");
+        $totAllSql = $hasTotAll ? "COALESCE(SUM(total_amount), 0)" : "($totSubSql + $totDevSql)";
+
+        $stmtSub = $pdo->prepare("
+            SELECT 
+                COALESCE(SUM(student_count), 0) as total_students,
+                $normSql as normal_subsidy,
+                $smallSql as small_school_subsidy,
+                $totSubSql as total_subsidy,
+                $totDevSql as total_dev,
+                $totAllSql as grand_total
+            FROM `student_subsidies` 
+            WHERE fiscal_year_id = ?
+        ");
+        $stmtSub->execute([$selectedYearId]);
+        $subSummary = $stmtSub->fetch(PDO::FETCH_ASSOC);
+        $calculatedSubsidyTotal = $subSummary ? (float)($subSummary['grand_total'] ?? 0) : 0.00;
+    } catch (\Throwable $eSub) {
+        $calculatedSubsidyTotal = 0.00;
+    }
 
     // การจัดสรรงบ 5 ช่อง (4 กลุ่มงาน + กันไว้ค่าใช้จ่ายอื่นๆ)
-    $stmt_alloc = $pdo->prepare("SELECT * FROM department_allocations WHERE fiscal_year_id = ? ORDER BY id ASC");
-    $stmt_alloc->execute([$selectedYearId]);
-    $allocations = $stmt_alloc->fetchAll(PDO::FETCH_ASSOC);
-
-    // หากยังไม่มีการกำหนด 5 กลุ่มงานสำหรับปีนี้ ให้สร้างค่าเริ่มต้น
-    if (empty($allocations) && $selectedYearId > 0) {
-        $defaultDepts = [
-            ['academic', 'งานบริหารงานวิชาการ', 45.00, 'ยกระดับผลสัมฤทธิ์ทางการเรียนและพัฒนาคุณภาพผู้เรียน'],
-            ['personnel', 'งานบุคคล', 10.00, 'พัฒนาครูและบุคลากรทางการศึกษา วินัยและมาตรฐานวิชาชีพ'],
-            ['budget', 'งานงบประมาณ', 10.00, 'บริหารการเงิน บัญชี พัสดุและสินทรัพย์'],
-            ['general', 'งานบริหารงานทั่วไป', 20.00, 'อาคารสถานที่ ความปลอดภัย สัมพันธ์ชุมชน และสิ่งแวดล้อม'],
-            ['reserve', 'กันไว้สำหรับค่าใช้จ่ายอื่นๆ', 15.00, 'งบสำรองจ่ายกรณีฉุกเฉินและภารกิจเร่งด่วน']
-        ];
-
-        $stmtDefAlloc = $pdo->prepare("
-            INSERT INTO department_allocations (
-                school_id, fiscal_year_id, department, department_name, percentage, allocated_amount, notes
-            ) VALUES (1, ?, ?, ?, ?, 0.00, ?)
-        ");
-        foreach ($defaultDepts as $d) {
-            $stmtDefAlloc->execute([$selectedYearId, $d[0], $d[1], $d[2], $d[3]]);
-        }
-
+    $allocations = [];
+    try {
+        $stmt_alloc = $pdo->prepare("SELECT * FROM department_allocations WHERE fiscal_year_id = ? ORDER BY id ASC");
         $stmt_alloc->execute([$selectedYearId]);
         $allocations = $stmt_alloc->fetchAll(PDO::FETCH_ASSOC);
+
+        // หากยังไม่มีการกำหนด 5 กลุ่มงานสำหรับปีนี้ ให้สร้างค่าเริ่มต้น
+        if (empty($allocations) && $selectedYearId > 0) {
+            $allocCols = getTableColumns($pdo, 'department_allocations');
+            $hasAllocSchool = in_array('school_id', $allocCols);
+            $hasDeptName = in_array('department_name', $allocCols);
+            $hasNotes = in_array('notes', $allocCols);
+
+            $defaultDepts = [
+                ['academic', 'งานบริหารงานวิชาการ', 45.00, 'ยกระดับผลสัมฤทธิ์ทางการเรียนและพัฒนาคุณภาพผู้เรียน'],
+                ['personnel', 'งานบุคคล', 10.00, 'พัฒนาครูและบุคลากรทางการศึกษา วินัยและมาตรฐานวิชาชีพ'],
+                ['budget', 'งานงบประมาณ', 10.00, 'บริหารการเงิน บัญชี พัสดุและสินทรัพย์'],
+                ['general', 'งานบริหารงานทั่วไป', 20.00, 'อาคารสถานที่ ความปลอดภัย สัมพันธ์ชุมชน และสิ่งแวดล้อม'],
+                ['reserve', 'กันไว้สำหรับค่าใช้จ่ายอื่นๆ', 15.00, 'งบสำรองจ่ายกรณีฉุกเฉินและภารกิจเร่งด่วน']
+            ];
+
+            foreach ($defaultDepts as $d) {
+                $daCols = ["`fiscal_year_id`", "`department`", "`percentage`", "`allocated_amount`"];
+                $daVals = [$selectedYearId, $d[0], $d[2], 0.00];
+                if ($hasAllocSchool) { $daCols[] = "`school_id`"; $daVals[] = 1; }
+                if ($hasDeptName) { $daCols[] = "`department_name`"; $daVals[] = $d[1]; }
+                if ($hasNotes) { $daCols[] = "`notes`"; $daVals[] = $d[3]; }
+
+                $ph = array_fill(0, count($daCols), '?');
+                $stmtDefAlloc = $pdo->prepare("INSERT INTO `department_allocations` (" . implode(', ', $daCols) . ") VALUES (" . implode(', ', $ph) . ")");
+                $stmtDefAlloc->execute($daVals);
+            }
+
+            $stmt_alloc->execute([$selectedYearId]);
+            $allocations = $stmt_alloc->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (\Throwable $eAlloc) {
+        $allocations = [];
     }
 
     // โครงการ
-    $stmt_proj = $pdo->prepare("
-        SELECT p.*, bs.name as budget_source_name, u.name as proposer_name 
-        FROM projects p 
-        LEFT JOIN budget_sources bs ON p.budget_source_id = bs.id 
-        LEFT JOIN users u ON p.proposer_id = u.id 
-        WHERE p.fiscal_year_id = ? 
-        ORDER BY p.id ASC
-    ");
-    $stmt_proj->execute([$selectedYearId]);
-    $projects = $stmt_proj->fetchAll(PDO::FETCH_ASSOC);
+    $projects = [];
+    try {
+        $stmt_proj = $pdo->prepare("
+            SELECT p.*, bs.name as budget_source_name, u.name as proposer_name 
+            FROM projects p 
+            LEFT JOIN budget_sources bs ON p.budget_source_id = bs.id 
+            LEFT JOIN users u ON p.proposer_id = u.id 
+            WHERE p.fiscal_year_id = ? 
+            ORDER BY p.id ASC
+        ");
+        $stmt_proj->execute([$selectedYearId]);
+        $projects = $stmt_proj->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (\Throwable $eProj) {
+        $projects = [];
+    }
 
     // ดึงค่าใช้จ่ายจริงของแต่ละโครงการ
     $totalApprovedBudget = 0;
@@ -150,23 +191,29 @@ try {
     $approvedCount = 0;
 
     foreach ($projects as &$p) {
-        $stmt_exp = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as spent FROM project_expenses WHERE project_id = ?");
-        $stmt_exp->execute([$p['id']]);
-        $exp_row = $stmt_exp->fetch(PDO::FETCH_ASSOC);
-        $spent = (float)($exp_row['spent'] ?? 0);
-        $approved = (float)$p['approved_budget'];
+        $spent = 0;
+        try {
+            $stmt_exp = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) as spent FROM project_expenses WHERE project_id = ?");
+            $stmt_exp->execute([$p['id']]);
+            $exp_row = $stmt_exp->fetch(PDO::FETCH_ASSOC);
+            $spent = (float)($exp_row['spent'] ?? 0);
+        } catch (\Throwable $eExp) {
+            $spent = 0;
+        }
+
+        $approved = (float)($p['approved_budget'] ?? 0);
         $remaining = $approved - $spent;
         $pct = $approved > 0 ? round(($spent / $approved) * 100, 1) : 0;
 
         $p['financials'] = [
-            'requested' => (float)$p['requested_budget'],
+            'requested' => (float)($p['requested_budget'] ?? 0),
             'approved' => $approved,
             'spent' => $spent,
             'remaining' => $remaining,
             'percentSpent' => $pct
         ];
 
-        if ($p['status'] === 'approved') {
+        if (($p['status'] ?? '') === 'approved') {
             $approvedCount++;
             $totalApprovedBudget += $approved;
         }
@@ -222,8 +269,7 @@ try {
         ]
     ], JSON_UNESCAPED_UNICODE);
 
-} catch (Exception $e) {
-    http_response_code(500);
+} catch (\Throwable $e) {
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
 ?>

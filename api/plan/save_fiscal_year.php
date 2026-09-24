@@ -58,69 +58,211 @@ try {
         $pdo->query("UPDATE fiscal_years SET is_current = 0");
     }
 
+    $fyCols = getTableColumns($pdo, 'fiscal_years');
+    $hasYear = in_array('year', $fyCols);
+    $hasYearBe = in_array('year_be', $fyCols);
+    $hasSchoolId = in_array('school_id', $fyCols);
     $yearBe = !empty($year) ? (int)$year : 2568;
 
     // กรณีแก้ไขปีงบประมาณเดิม
     if ($year_id > 0) {
-        $stmtUp = $pdo->prepare("
-            UPDATE fiscal_years 
-            SET year = ?, year_be = ?, start_date = ?, end_date = ?, is_current = ?, status = ?
-            WHERE id = ?
-        ");
-        $stmtUp->execute([$year, $yearBe, $start_date, $end_date, $is_current, $status, $year_id]);
+        $updateFields = [];
+        $updateParams = [];
+
+        if ($hasYear) {
+            $updateFields[] = "`year` = ?";
+            $updateParams[] = $year;
+        }
+        if ($hasYearBe) {
+            $updateFields[] = "`year_be` = ?";
+            $updateParams[] = $yearBe;
+        }
+        if (in_array('start_date', $fyCols)) {
+            $updateFields[] = "`start_date` = ?";
+            $updateParams[] = $start_date;
+        }
+        if (in_array('end_date', $fyCols)) {
+            $updateFields[] = "`end_date` = ?";
+            $updateParams[] = $end_date;
+        }
+        if (in_array('is_current', $fyCols)) {
+            $updateFields[] = "`is_current` = ?";
+            $updateParams[] = $is_current;
+        }
+        if (in_array('status', $fyCols)) {
+            $updateFields[] = "`status` = ?";
+            $updateParams[] = $status;
+        }
+
+        $updateParams[] = $year_id;
+        $sqlUp = "UPDATE `fiscal_years` SET " . implode(', ', $updateFields) . " WHERE id = ?";
+        $stmtUp = $pdo->prepare($sqlUp);
+        $stmtUp->execute($updateParams);
         $targetYearId = $year_id;
     } else {
         // ตรวจสอบว่ามีปีนี้อยู่แล้วหรือไม่
-        $stmtCheck = $pdo->prepare("SELECT id FROM fiscal_years WHERE year = ? OR year_be = ? LIMIT 1");
-        $stmtCheck->execute([$year, $yearBe]);
-        $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        $existing = null;
+        if ($hasYear && $hasYearBe) {
+            $stmtCheck = $pdo->prepare("SELECT id FROM `fiscal_years` WHERE `year` = ? OR `year_be` = ? LIMIT 1");
+            $stmtCheck->execute([$year, $yearBe]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        } elseif ($hasYear) {
+            $stmtCheck = $pdo->prepare("SELECT id FROM `fiscal_years` WHERE `year` = ? LIMIT 1");
+            $stmtCheck->execute([$year]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        } elseif ($hasYearBe) {
+            $stmtCheck = $pdo->prepare("SELECT id FROM `fiscal_years` WHERE `year_be` = ? LIMIT 1");
+            $stmtCheck->execute([$yearBe]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        }
 
         if ($existing) {
             $targetYearId = (int)$existing['id'];
-            $stmtUp = $pdo->prepare("
-                UPDATE fiscal_years 
-                SET year = ?, year_be = ?, start_date = ?, end_date = ?, is_current = ?, status = ?
-                WHERE id = ?
-            ");
-            $stmtUp->execute([$year, $yearBe, $start_date, $end_date, $is_current, $status, $targetYearId]);
+            $updateFields = [];
+            $updateParams = [];
+
+            if ($hasYear) {
+                $updateFields[] = "`year` = ?";
+                $updateParams[] = $year;
+            }
+            if ($hasYearBe) {
+                $updateFields[] = "`year_be` = ?";
+                $updateParams[] = $yearBe;
+            }
+            if (in_array('start_date', $fyCols)) {
+                $updateFields[] = "`start_date` = ?";
+                $updateParams[] = $start_date;
+            }
+            if (in_array('end_date', $fyCols)) {
+                $updateFields[] = "`end_date` = ?";
+                $updateParams[] = $end_date;
+            }
+            if (in_array('is_current', $fyCols)) {
+                $updateFields[] = "`is_current` = ?";
+                $updateParams[] = $is_current;
+            }
+            if (in_array('status', $fyCols)) {
+                $updateFields[] = "`status` = ?";
+                $updateParams[] = $status;
+            }
+
+            $updateParams[] = $targetYearId;
+            $sqlUp = "UPDATE `fiscal_years` SET " . implode(', ', $updateFields) . " WHERE id = ?";
+            $stmtUp = $pdo->prepare($sqlUp);
+            $stmtUp->execute($updateParams);
         } else {
-            $stmtIn = $pdo->prepare("
-                INSERT INTO fiscal_years (
-                    school_id, year, year_be, start_date, end_date, is_current, status, 
-                    total_budget_base, utility_reserve, utility_reserve_notes, allocatable_budget
-                ) VALUES (
-                    1, ?, ?, ?, ?, ?, ?,
-                    0.00, 0.00, 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)', 0.00
-                )
-            ");
-            $stmtIn->execute([$year, $yearBe, $start_date, $end_date, $is_current, $status]);
+            $insCols = [];
+            $insPlaceholders = [];
+            $insValues = [];
+
+            if ($hasSchoolId) {
+                $insCols[] = "`school_id`";
+                $insPlaceholders[] = "?";
+                $insValues[] = 1;
+            }
+            if ($hasYear) {
+                $insCols[] = "`year`";
+                $insPlaceholders[] = "?";
+                $insValues[] = $year;
+            }
+            if ($hasYearBe) {
+                $insCols[] = "`year_be`";
+                $insPlaceholders[] = "?";
+                $insValues[] = $yearBe;
+            }
+            if (in_array('start_date', $fyCols)) {
+                $insCols[] = "`start_date`";
+                $insPlaceholders[] = "?";
+                $insValues[] = $start_date;
+            }
+            if (in_array('end_date', $fyCols)) {
+                $insCols[] = "`end_date`";
+                $insPlaceholders[] = "?";
+                $insValues[] = $end_date;
+            }
+            if (in_array('is_current', $fyCols)) {
+                $insCols[] = "`is_current`";
+                $insPlaceholders[] = "?";
+                $insValues[] = $is_current;
+            }
+            if (in_array('status', $fyCols)) {
+                $insCols[] = "`status`";
+                $insPlaceholders[] = "?";
+                $insValues[] = $status;
+            }
+            if (in_array('total_budget_base', $fyCols)) {
+                $insCols[] = "`total_budget_base`";
+                $insPlaceholders[] = "?";
+                $insValues[] = 0.00;
+            }
+            if (in_array('utility_reserve', $fyCols)) {
+                $insCols[] = "`utility_reserve`";
+                $insPlaceholders[] = "?";
+                $insValues[] = 0.00;
+            }
+            if (in_array('utility_reserve_notes', $fyCols)) {
+                $insCols[] = "`utility_reserve_notes`";
+                $insPlaceholders[] = "?";
+                $insValues[] = 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)';
+            }
+            if (in_array('allocatable_budget', $fyCols)) {
+                $insCols[] = "`allocatable_budget`";
+                $insPlaceholders[] = "?";
+                $insValues[] = 0.00;
+            }
+
+            $sqlIns = "INSERT INTO `fiscal_years` (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $insPlaceholders) . ")";
+            $stmtIn = $pdo->prepare($sqlIns);
+            $stmtIn->execute($insValues);
             $targetYearId = (int)$pdo->lastInsertId();
         }
     }
 
     // กำหนดสัดส่วน 5 ช่องงานมาตรฐาน หากยังไม่มีใน department_allocations
-    $stmtAllocCheck = $pdo->prepare("SELECT COUNT(*) FROM department_allocations WHERE fiscal_year_id = ?");
-    $stmtAllocCheck->execute([$targetYearId]);
-    $allocCount = (int)$stmtAllocCheck->fetchColumn();
+    try {
+        $stmtAllocCheck = $pdo->prepare("SELECT COUNT(*) FROM `department_allocations` WHERE `fiscal_year_id` = ?");
+        $stmtAllocCheck->execute([$targetYearId]);
+        $allocCount = (int)$stmtAllocCheck->fetchColumn();
 
-    if ($allocCount === 0) {
-        $defaults = [
-            ['academic', 'งานบริหารงานวิชาการ', 45.00, 'ยกระดับผลสัมฤทธิ์ทางการเรียนและพัฒนาคุณภาพผู้เรียน'],
-            ['personnel', 'งานบุคคล', 10.00, 'พัฒนาครูและบุคลากรทางการศึกษา วินัยและมาตรฐานวิชาชีพ'],
-            ['budget', 'งานงบประมาณ', 10.00, 'บริหารการเงิน บัญชี พัสดุและสินทรัพย์'],
-            ['general', 'งานบริหารงานทั่วไป', 20.00, 'อาคารสถานที่ ความปลอดภัย สัมพันธ์ชุมชน และสิ่งแวดล้อม'],
-            ['reserve', 'กันไว้สำหรับค่าใช้จ่ายอื่นๆ', 15.00, 'งบสำรองจ่ายกรณีฉุกเฉินและภารกิจเร่งด่วน']
-        ];
-        $stmt_alloc = $pdo->prepare("
-            INSERT INTO department_allocations (
-                school_id, fiscal_year_id, department, department_name, percentage, allocated_amount, notes
-            ) VALUES (
-                1, ?, ?, ?, ?, 0.00, ?
-            )
-        ");
-        foreach ($defaults as $d) {
-            $stmt_alloc->execute([$targetYearId, $d[0], $d[1], $d[2], $d[3]]);
+        if ($allocCount === 0) {
+            $allocCols = getTableColumns($pdo, 'department_allocations');
+            $hasAllocSchool = in_array('school_id', $allocCols);
+            $hasAllocNotes = in_array('notes', $allocCols);
+            $hasDeptName = in_array('department_name', $allocCols);
+
+            $defaults = [
+                ['academic', 'งานบริหารงานวิชาการ', 45.00, 'ยกระดับผลสัมฤทธิ์ทางการเรียนและพัฒนาคุณภาพผู้เรียน'],
+                ['personnel', 'งานบุคคล', 10.00, 'พัฒนาครูและบุคลากรทางการศึกษา วินัยและมาตรฐานวิชาชีพ'],
+                ['budget', 'งานงบประมาณ', 10.00, 'บริหารการเงิน บัญชี พัสดุและสินทรัพย์'],
+                ['general', 'งานบริหารงานทั่วไป', 20.00, 'อาคารสถานที่ ความปลอดภัย สัมพันธ์ชุมชน และสิ่งแวดล้อม'],
+                ['reserve', 'กันไว้สำหรับค่าใช้จ่ายอื่นๆ', 15.00, 'งบสำรองจ่ายกรณีฉุกเฉินและภารกิจเร่งด่วน']
+            ];
+
+            foreach ($defaults as $d) {
+                $daCols = ["`fiscal_year_id`", "`department`", "`percentage`", "`allocated_amount`"];
+                $daVals = [$targetYearId, $d[0], $d[2], 0.00];
+
+                if ($hasAllocSchool) {
+                    $daCols[] = "`school_id`";
+                    $daVals[] = 1;
+                }
+                if ($hasDeptName) {
+                    $daCols[] = "`department_name`";
+                    $daVals[] = $d[1];
+                }
+                if ($hasAllocNotes) {
+                    $daCols[] = "`notes`";
+                    $daVals[] = $d[3];
+                }
+
+                $placeholders = array_fill(0, count($daCols), '?');
+                $sqlDa = "INSERT INTO `department_allocations` (" . implode(', ', $daCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+                $stmtDa = $pdo->prepare($sqlDa);
+                $stmtDa->execute($daVals);
+            }
         }
+    } catch (\Throwable $eAlloc) {
+        error_log("Alloc default warning: " . $eAlloc->getMessage());
     }
 
     echo json_encode([
@@ -129,8 +271,7 @@ try {
         'year_id' => $targetYearId
     ], JSON_UNESCAPED_UNICODE);
 
-} catch (Exception $e) {
-    http_response_code(500);
+} catch (\Throwable $e) {
     echo json_encode([
         'status' => 'error',
         'message' => 'เกิดข้อผิดพลาดในการบันทึกปีงบประมาณ: ' . $e->getMessage()

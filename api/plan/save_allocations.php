@@ -70,28 +70,29 @@ try {
         $hasSources = $stmtSrcCheck->fetchColumn() > 0;
 
         if (!$hasSources) {
-            $stmtInsertSrc = $pdo->prepare("
-                INSERT INTO budget_sources (school_id, fiscal_year_id, code, name, category, amount, description) 
-                VALUES (1, ?, 'SRC-01', 'งบประมาณที่กำหนดสำหรับจัดสรร', 'subsidy', ?, 'กำหนดโดยผู้ใช้')
-            ");
-            $stmtInsertSrc->execute([$fiscal_year_id, $total_budget_base]);
+            $srcCols = getTableColumns($pdo, 'budget_sources');
+            $bCols = ["`fiscal_year_id`", "`name`", "`amount`"];
+            $bVals = [$fiscal_year_id, 'งบประมาณที่กำหนดสำหรับจัดสรร', $total_budget_base];
+
+            if (in_array('school_id', $srcCols)) { $bCols[] = "`school_id`"; $bVals[] = 1; }
+            if (in_array('code', $srcCols)) { $bCols[] = "`code`"; $bVals[] = 'SRC-01'; }
+            if (in_array('source_type', $srcCols)) { $bCols[] = "`source_type`"; $bVals[] = 'สพฐ.'; }
+            if (in_array('notes', $srcCols)) { $bCols[] = "`notes`"; $bVals[] = 'กำหนดโดยผู้ใช้'; }
+
+            $placeholders = array_fill(0, count($bCols), '?');
+            $sqlSrc = "INSERT INTO `budget_sources` (" . implode(', ', $bCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            $stmtInsertSrc = $pdo->prepare($sqlSrc);
+            $stmtInsertSrc->execute($bVals);
         }
     }
 
     // 3. จัดการบันทึก department_allocations (ทั้ง 5 ช่อง)
+    $allocCols = getTableColumns($pdo, 'department_allocations');
+    $hasAllocSchool = in_array('school_id', $allocCols);
+    $hasDeptName = in_array('department_name', $allocCols);
+    $hasNotes = in_array('notes', $allocCols);
+
     $stmtFindAlloc = $pdo->prepare("SELECT id FROM department_allocations WHERE fiscal_year_id = ? AND department = ? LIMIT 1");
-    $stmtUpdateAlloc = $pdo->prepare("
-        UPDATE department_allocations 
-        SET department_name = ?, percentage = ?, allocated_amount = ?, notes = ?
-        WHERE id = ?
-    ");
-    $stmtInsertAlloc = $pdo->prepare("
-        INSERT INTO department_allocations (
-            school_id, fiscal_year_id, department, department_name, percentage, allocated_amount, notes
-        ) VALUES (
-            1, ?, ?, ?, ?, ?, ?
-        )
-    ");
 
     foreach ($allocations as $a) {
         $deptKey = $a['department'];
@@ -104,9 +105,26 @@ try {
         $existingAlloc = $stmtFindAlloc->fetch(PDO::FETCH_ASSOC);
 
         if ($existingAlloc) {
-            $stmtUpdateAlloc->execute([$deptName, $pct, $amt, $notes, $existingAlloc['id']]);
+            $upFields = ["`percentage` = ?", "`allocated_amount` = ?"];
+            $upParams = [$pct, $amt];
+            if ($hasDeptName) { $upFields[] = "`department_name` = ?"; $upParams[] = $deptName; }
+            if ($hasNotes) { $upFields[] = "`notes` = ?"; $upParams[] = $notes; }
+            $upParams[] = $existingAlloc['id'];
+
+            $sqlUpA = "UPDATE `department_allocations` SET " . implode(', ', $upFields) . " WHERE id = ?";
+            $stmtUpA = $pdo->prepare($sqlUpA);
+            $stmtUpA->execute($upParams);
         } else {
-            $stmtInsertAlloc->execute([$fiscal_year_id, $deptKey, $deptName, $pct, $amt, $notes]);
+            $inCols = ["`fiscal_year_id`", "`department`", "`percentage`", "`allocated_amount`"];
+            $inVals = [$fiscal_year_id, $deptKey, $pct, $amt];
+            if ($hasAllocSchool) { $inCols[] = "`school_id`"; $inVals[] = 1; }
+            if ($hasDeptName) { $inCols[] = "`department_name`"; $inVals[] = $deptName; }
+            if ($hasNotes) { $inCols[] = "`notes`"; $inVals[] = $notes; }
+
+            $placeholders = array_fill(0, count($inCols), '?');
+            $sqlInA = "INSERT INTO `department_allocations` (" . implode(', ', $inCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            $stmtInA = $pdo->prepare($sqlInA);
+            $stmtInA->execute($inVals);
         }
     }
 
@@ -124,6 +142,5 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
