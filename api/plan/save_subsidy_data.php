@@ -14,7 +14,9 @@ if (!($pdo instanceof PDO)) {
 
 try {
     // ตรวจสอบโครงสร้างตารางก่อนบันทึกข้อมูล ป้องกันข้อผิดพลาด column not found
-    ensureDatabaseIntegrity($pdo);
+    if (function_exists('ensureDatabaseIntegrity')) {
+        ensureDatabaseIntegrity($pdo);
+    }
 
     $data = json_decode(file_get_contents('php://input'), true);
     if (!is_array($data)) {

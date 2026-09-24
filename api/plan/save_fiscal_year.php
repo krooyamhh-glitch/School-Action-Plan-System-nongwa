@@ -7,18 +7,20 @@ if (!($pdo instanceof PDO)) {
     exit;
 }
 
-ensureDatabaseIntegrity($pdo);
-
-$data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-$action = trim($data['action'] ?? '');
-$year_id = (int)($data['id'] ?? $data['year_id'] ?? 0);
-$year = trim($data['year'] ?? '');
-$start_date = trim($data['start_date'] ?? '');
-$end_date = trim($data['end_date'] ?? '');
-$is_current = !empty($data['is_current']) ? 1 : 0;
-$status = trim($data['status'] ?? 'active');
-
 try {
+    if (function_exists('ensureDatabaseIntegrity')) {
+        ensureDatabaseIntegrity($pdo);
+    }
+
+    $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    $action = trim($data['action'] ?? '');
+    $year_id = (int)($data['id'] ?? $data['year_id'] ?? 0);
+    $year = trim($data['year'] ?? '');
+    $start_date = trim($data['start_date'] ?? '');
+    $end_date = trim($data['end_date'] ?? '');
+    $is_current = !empty($data['is_current']) ? 1 : 0;
+    $status = trim($data['status'] ?? 'active');
+
     // กรณีเลือกตั้งให้เป็นปีปัจจุบันทันที (Quick Switch Current Year)
     if ($action === 'set_current' && $year_id > 0) {
         $pdo->query("UPDATE fiscal_years SET is_current = 0");

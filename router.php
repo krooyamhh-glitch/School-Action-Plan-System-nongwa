@@ -10,6 +10,21 @@ if ($uri === '/' || $uri === '') {
     return true;
 }
 
+if ($uri === '/favicon.ico') {
+    if (file_exists(__DIR__ . '/favicon.ico')) {
+        header('Content-Type: image/x-icon');
+        readfile(__DIR__ . '/favicon.ico');
+        return true;
+    }
+    if (file_exists(__DIR__ . '/favicon.svg')) {
+        header('Content-Type: image/svg+xml');
+        readfile(__DIR__ . '/favicon.svg');
+        return true;
+    }
+    http_response_code(204);
+    return true;
+}
+
 $filePath = __DIR__ . $uri;
 
 // If it is a static file (not PHP), let the built-in server handle it directly

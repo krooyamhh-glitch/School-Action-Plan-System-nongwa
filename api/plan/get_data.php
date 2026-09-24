@@ -11,7 +11,9 @@ if (!($pdo instanceof PDO)) {
 }
 
 try {
-    ensureDatabaseIntegrity($pdo);
+    if (function_exists('ensureDatabaseIntegrity')) {
+        ensureDatabaseIntegrity($pdo);
+    }
 
     $selectedYearId = isset($_GET['year_id']) ? (int)$_GET['year_id'] : 0;
     
