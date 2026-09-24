@@ -12,6 +12,9 @@ if (!($pdo instanceof PDO)) {
     exit;
 }
 
+// ตรวจสอบโครงสร้างตารางก่อนบันทึกข้อมูล ป้องกันข้อผิดพลาด column not found
+ensureDatabaseIntegrity($pdo);
+
 $data = json_decode(file_get_contents('php://input'), true);
 $fiscal_year_id = (int)($data['fiscal_year_id'] ?? 0);
 $rates = $data['rates'] ?? [];
@@ -24,7 +27,7 @@ if ($fiscal_year_id <= 0) {
         $fiscal_year_id = (int)$rowY['id'];
     } else {
         // Create default fiscal year 2568
-        $stmtCreateY = $pdo->prepare("INSERT INTO fiscal_years (year, start_date, end_date, is_current, status) VALUES ('2568', '2024-10-01', '2025-09-30', 1, 'active')");
+        $stmtCreateY = $pdo->prepare("INSERT INTO fiscal_years (school_id, year, start_date, end_date, is_current, status) VALUES (1, '2568', '2024-10-01', '2025-09-30', 1, 'active')");
         $stmtCreateY->execute();
         $fiscal_year_id = (int)$pdo->lastInsertId();
     }
@@ -49,18 +52,20 @@ try {
     $stmtUpsert = $pdo->prepare("
         INSERT INTO student_subsidies (
             school_id, fiscal_year_id, level_key, level_name,
-            student_count, subsidy_rate, small_school_subsidy, dev_rate,
+            student_count, subsidy_rate, per_head_subsidy, small_school_subsidy, dev_rate, per_head_dev,
             total_subsidy_amount, total_dev_amount, total_amount
         ) VALUES (
             1, ?, ?, ?,
-            ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
             ?, ?, ?
         )
         ON DUPLICATE KEY UPDATE
             student_count = VALUES(student_count),
             subsidy_rate = VALUES(subsidy_rate),
+            per_head_subsidy = VALUES(per_head_subsidy),
             small_school_subsidy = VALUES(small_school_subsidy),
             dev_rate = VALUES(dev_rate),
+            per_head_dev = VALUES(per_head_dev),
             total_subsidy_amount = VALUES(total_subsidy_amount),
             total_dev_amount = VALUES(total_dev_amount),
             total_amount = VALUES(total_amount),
@@ -86,8 +91,10 @@ try {
             $lvlName,
             $count,
             $subsidyRate,
+            $subsidyRate, // per_head_subsidy
             $smallRate,
             $devRate,
+            $devRate,     // per_head_dev
             $subTotal,
             $devTotal,
             $rowTotal

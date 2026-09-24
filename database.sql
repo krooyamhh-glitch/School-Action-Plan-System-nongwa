@@ -10,7 +10,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 CREATE TABLE IF NOT EXISTS `schools` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `code` VARCHAR(10) UNIQUE NOT NULL, -- รหัสโรงเรียน
-  `smis_code` VARCHAR(8) UNIQUE NOT NULL, -- รหัส SMIS 8 หลัก เช่น 10310001
+  `smis_code` VARCHAR(20) DEFAULT '10310001', -- รหัส SMIS 8 หลัก เช่น 10310001
   `name` VARCHAR(255) NOT NULL,
   `province` VARCHAR(100) NOT NULL,
   `district` VARCHAR(100) DEFAULT '',
@@ -243,8 +243,8 @@ CREATE TABLE IF NOT EXISTS `app_settings` (
 -- ข้อมูลเริ่มต้น (Seed Data สำหรับโรงเรียนมาตรฐาน)
 -- =======================================================
 
-INSERT INTO `schools` (`id`, `code`, `name`, `province`, `affiliation`, `director_name`, `director_position`, `plan_officer_name`, `logo_url`) VALUES
-(1, '10310001', 'โรงเรียนอนุบาลพัฒนาวิทยา', 'กรุงเทพมหานคร', 'สังกัดสถานศึกษา', 'นายธีระพล เกียรติวิทยา', 'ผู้อำนวยการโรงเรียนอนุบาลพัฒนาวิทยา', 'นางวิไลพร งบมั่นคง', '');
+INSERT INTO `schools` (`id`, `code`, `smis_code`, `name`, `province`, `affiliation`, `director_name`, `director_position`, `plan_officer_name`, `logo_url`) VALUES
+(1, '10310001', '10310001', 'โรงเรียนอนุบาลพัฒนาวิทยา', 'กรุงเทพมหานคร', 'สังกัดสถานศึกษา', 'นายธีระพล เกียรติวิทยา', 'ผู้อำนวยการโรงเรียนอนุบาลพัฒนาวิทยา', 'นางวิไลพร งบมั่นคง', '');
 
 -- ตั้งค่าระบบ
 INSERT INTO `app_settings` (`setting_key`, `setting_value`) VALUES

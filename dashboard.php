@@ -48,12 +48,14 @@
             <!-- Fiscal Year Switcher & User Profile Controls -->
             <div class="flex items-center gap-2 sm:gap-3">
                 <!-- Fiscal Year Selector -->
-                <div class="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200">
+                <div class="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200 gap-1">
                     <span class="text-xs font-semibold text-slate-500 pl-2 pr-1 hidden md:inline">ปีงบ:</span>
                     <select id="fiscalYearSelect" onchange="onFiscalYearChange(this.value)" class="bg-transparent text-xs font-bold text-slate-800 outline-none pr-1 cursor-pointer">
                         <option value="1">2568 (ปัจจุบัน)</option>
-                        <option value="2">2567 (ย้อนหลัง)</option>
                     </select>
+                    <button onclick="openFiscalYearModal()" title="จัดการและตั้งค่าปีงบประมาณ" class="p-1 hover:bg-white text-blue-600 rounded-lg transition shadow-2xs">
+                        <i data-lucide="calendar-cog" class="w-3.5 h-3.5"></i>
+                    </button>
                 </div>
 
                 <!-- Print Full Book Quick Button -->
@@ -501,22 +503,27 @@
                     </div>
                 </div>
 
-                <!-- Section 2: Preset Ratio Shortcuts & Total Percentage Status Banner -->
-                <div class="space-y-3">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-bold text-slate-700">สัดส่วนมาตรฐานรวดเร็ว:</span>
-                            <div class="flex flex-wrap gap-1.5">
-                                <button type="button" onclick="applyPresetAllocation('standard')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs">
-                                    สพฐ. มาตรฐาน (45-10-10-20-15)
-                                </button>
-                                <button type="button" onclick="applyPresetAllocation('academic')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs">
-                                    เน้นวิชาการ (55-10-5-15-15)
-                                </button>
-                                <button type="button" onclick="applyPresetAllocation('equal')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition shadow-2xs">
-                                    หารเท่ากัน 5 ช่อง (20% ทุกช่อง)
+                <!-- Section 2: Visual Allocation Proportion Bar & Total Percentage Status Banner -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                    <!-- Visual Stacked Bar Header -->
+                    <div class="space-y-2">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                <i data-lucide="bar-chart-2" class="w-4 h-4 text-blue-600"></i>
+                                แถบแสดงสัดส่วนร้อยละ 5 ช่องงาน (Allocation Proportion Bar)
+                            </span>
+                            <div class="flex items-center gap-3">
+                                <span id="stackedBarSumText" class="text-blue-700 font-extrabold text-xs">100.00%</span>
+                                <button type="button" onclick="autoBalanceAllocation()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs">
+                                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> ปรับส่วนที่เหลือให้ครบ 100% อัตโนมัติ
                                 </button>
                             </div>
+                        </div>
+                        <div class="h-6 w-full bg-slate-100 rounded-xl overflow-hidden flex shadow-inner border border-slate-200" id="allocStackedBar">
+                            <!-- Populated dynamically via updateStackedBar() -->
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 pt-1 text-[11px]" id="allocLegendContainer">
+                            <!-- Legend items populated dynamically -->
                         </div>
                     </div>
 
@@ -541,13 +548,48 @@
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">2</span>
-                            จัดสรรงบประมาณ 5 ช่องงาน (กรอกร้อยละหรือจำนวนเงิน ระบบจะคำนวณสลับให้อัตโนมัติ)
+                            จัดสรรงบประมาณ 5 ช่องงาน (กรอกร้อยละ เลื่อน Slider หรือกรอกจำนวนเงิน ระบบจะคำนวณสลับให้อัตโนมัติ)
                         </h3>
-                        <span class="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">5 ช่องงาน</span>
+                        <span class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg">5 ช่องงานมาตรฐาน</span>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="allocationCardsContainer">
                         <!-- Populated dynamically with 5 departments -->
+                    </div>
+                </div>
+
+                <!-- Section 4: Summary Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="table" class="w-4 h-4 text-blue-600"></i>
+                            ตารางสรุปการจัดสรรงบประมาณ 5 ช่องงาน (100% Summary)
+                        </h3>
+                        <span class="text-xs text-slate-500">ข้อมูลจัดสรรปีงบประมาณปัจจุบัน</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                                <tr>
+                                    <th class="p-3 w-12 text-center">ช่องที่</th>
+                                    <th class="p-3">กลุ่มงาน / รายการจัดสรร</th>
+                                    <th class="p-3 text-center w-28">สัดส่วน (%)</th>
+                                    <th class="p-3 text-right w-40">จำนวนเงินจัดสรร (บาท)</th>
+                                    <th class="p-3">วัตถุประสงค์ / หมายเหตุ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allocationSummaryTableBody" class="divide-y divide-slate-100 font-medium">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                            <tfoot class="bg-slate-100/80 font-bold border-t border-slate-200 text-xs">
+                                <tr>
+                                    <td colspan="2" class="p-3 text-slate-900 font-extrabold">รวมจัดสรร 5 ช่องงานทั้งสิ้น</td>
+                                    <td class="p-3 text-center text-blue-900 font-black text-sm" id="allocTableTotalPct">100.00%</td>
+                                    <td class="p-3 text-right text-blue-900 font-black text-sm" id="allocTableTotalAmt">0.00 บาท</td>
+                                    <td class="p-3 text-slate-500" id="allocTableStatusNote">สัดส่วนครบ 100% พอดี</td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -2168,35 +2210,64 @@
 
     <!-- Modal 7: Fiscal Year Setting Modal -->
     <div id="fiscalYearModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
-                <h3 class="text-base font-bold text-slate-900">กำหนดปีงบประมาณใหม่</h3>
-                <button onclick="closeFiscalYearModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <i data-lucide="calendar" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">จัดการและตั้งค่าปีงบประมาณ</h3>
+                        <p class="text-xs text-slate-500">เลือกปีงบประมาณที่ทำงาน ตั้งเป็นปีปัจจุบัน หรือเพิ่มปีงบประมาณใหม่</p>
+                    </div>
+                </div>
+                <button onclick="closeFiscalYearModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <form id="fiscalYearForm" onsubmit="handleFiscalYearSubmit(event)" class="mt-4 space-y-3.5">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">ปีงบประมาณ (พ.ศ.) <span class="text-red-500">*</span></label>
-                    <input type="text" id="new_fy_year" required placeholder="เช่น 2569" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none">
+
+            <!-- Existing Fiscal Years List -->
+            <div>
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <i data-lucide="list" class="w-4 h-4 text-blue-600"></i>
+                    รายการปีงบประมาณในระบบ
+                </h4>
+                <div class="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100" id="modalFiscalYearsList">
+                    <!-- Populated dynamically via renderFiscalYearsListModal() -->
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+            </div>
+
+            <!-- Add / Edit Fiscal Year Form -->
+            <div class="pt-2">
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i>
+                    เพิ่มปีงบประมาณใหม่
+                </h4>
+                <form id="fiscalYearForm" onsubmit="handleFiscalYearSubmit(event)" class="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 space-y-3.5">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">วันเริ่มต้นปีงบ</label>
-                        <input type="date" id="new_fy_start" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">ปีงบประมาณ (พ.ศ.) <span class="text-red-500">*</span></label>
+                        <input type="text" id="new_fy_year" required placeholder="เช่น 2568, 2569" oninput="onFyYearInputChanged(this.value)" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-blue-500">
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">วันสิ้นสุดปีงบ</label>
-                        <input type="date" id="new_fy_end" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">วันเริ่มต้นปีงบประมาณ</label>
+                            <input type="date" id="new_fy_start" required class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">วันสิ้นสุดปีงบประมาณ</label>
+                            <input type="date" id="new_fy_end" required class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500">
+                        </div>
                     </div>
-                </div>
-                <div class="flex items-center gap-2 pt-1">
-                    <input type="checkbox" id="new_fy_is_current" class="w-4 h-4 rounded text-blue-600 cursor-pointer">
-                    <label for="new_fy_is_current" class="text-xs font-bold text-slate-700 cursor-pointer">กำหนดให้เป็นปีงบประมาณปัจจุบัน</label>
-                </div>
-                <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
-                    <button type="button" onclick="closeFiscalYearModal()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl">ยกเลิก</button>
-                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition">สร้างปีงบประมาณ</button>
-                </div>
-            </form>
+                    <div class="flex items-center gap-2 pt-1">
+                        <input type="checkbox" id="new_fy_is_current" class="w-4 h-4 rounded text-blue-600 cursor-pointer">
+                        <label for="new_fy_is_current" class="text-xs font-bold text-slate-700 cursor-pointer">กำหนดให้เป็นปีงบประมาณปัจจุบันทันที (Current Active Year)</label>
+                    </div>
+                    <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                        <button type="button" onclick="closeFiscalYearModal()" class="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl">ปิด</button>
+                        <button type="submit" id="btnSaveFiscalYear" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5">
+                            <i data-lucide="save" class="w-3.5 h-3.5"></i> บันทึกปีงบประมาณ
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 

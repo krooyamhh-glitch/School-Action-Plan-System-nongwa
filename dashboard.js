@@ -123,13 +123,15 @@ function formatBaht(num) {
 }
 
 // Data Fetching
-async function loadData(yearId = 1) {
+async function loadData(yearId = null) {
     try {
-        const res = await fetch(`/api/plan/get_data.php?year_id=${yearId}`);
+        const url = yearId ? `/api/plan/get_data.php?year_id=${yearId}` : `/api/plan/get_data.php`;
+        const res = await fetch(url);
         const data = await res.json();
         if (data.status === 'success') {
             appData = data;
-            selectedYearId = yearId;
+            selectedYearId = data.currentFiscalYear?.id ? parseInt(data.currentFiscalYear.id) : (yearId || 1);
+            renderFiscalYearSelect();
             renderAllViews();
         } else {
             console.error('Failed to load data:', data.message);
@@ -139,9 +141,20 @@ async function loadData(yearId = 1) {
     }
 }
 
+function renderFiscalYearSelect() {
+    const select = document.getElementById('fiscalYearSelect');
+    if (!select || !appData?.fiscalYears) return;
+
+    select.innerHTML = appData.fiscalYears.map(fy => {
+        const isCur = fy.is_current == 1;
+        const selected = (fy.id == selectedYearId) ? 'selected' : '';
+        return `<option value="${fy.id}" ${selected}>${fy.year} ${isCur ? '(ปัจจุบัน)' : ''}</option>`;
+    }).join('');
+}
+
 async function onFiscalYearChange(yearId) {
     await loadData(yearId);
-    showToast(`สลับข้อมูลเป็นปีงบประมาณ พ.ศ. ${appData.currentFiscalYear.year}`, 'success');
+    showToast(`สลับข้อมูลเป็นปีงบประมาณ พ.ศ. ${appData?.currentFiscalYear?.year || ''}`, 'success');
 }
 
 // Navigation Tabs
@@ -159,6 +172,8 @@ function switchTab(tabId) {
         renderCharts();
     } else if (tabId === 'subsidies') {
         loadSubsidyData();
+    } else if (tabId === 'allocation') {
+        renderAllocationsCards();
     } else if (tabId === 'school_settings') {
         loadSchoolSettings();
     } else if (tabId === 'superadmin') {
@@ -502,19 +517,105 @@ async function deleteBudgetSource(id) {
     }
 }
 
-// Fiscal Year Modal
+// Fiscal Year Modal & Management
 function openFiscalYearModal() {
-    document.getElementById('new_fy_year').value = (parseInt(appData.currentFiscalYear.year) + 1).toString();
-    document.getElementById('new_fy_start').value = '2025-10-01';
-    document.getElementById('new_fy_end').value = '2026-09-30';
-    document.getElementById('fiscalYearModal').classList.remove('hidden');
+    const curYear = appData?.currentFiscalYear?.year ? parseInt(appData.currentFiscalYear.year) : 2568;
+    const nextYear = curYear + 1;
+    const yInput = document.getElementById('new_fy_year');
+    if (yInput) {
+        yInput.value = nextYear.toString();
+        onFyYearInputChanged(nextYear.toString());
+    }
+    renderFiscalYearsListModal();
+    const modal = document.getElementById('fiscalYearModal');
+    if (modal) modal.classList.remove('hidden');
+    lucide.createIcons();
 }
+
 function closeFiscalYearModal() {
-    document.getElementById('fiscalYearModal').classList.add('hidden');
+    const modal = document.getElementById('fiscalYearModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function onFyYearInputChanged(val) {
+    const year = parseInt(val);
+    if (!isNaN(year) && year > 2400) {
+        const adYear = year - 543;
+        const startInput = document.getElementById('new_fy_start');
+        const endInput = document.getElementById('new_fy_end');
+        if (startInput) startInput.value = `${adYear - 1}-10-01`;
+        if (endInput) endInput.value = `${adYear}-09-30`;
+    }
+}
+
+function renderFiscalYearsListModal() {
+    const container = document.getElementById('modalFiscalYearsList');
+    if (!container) return;
+    const years = appData?.fiscalYears || [];
+    if (years.length === 0) {
+        container.innerHTML = `<div class="p-4 text-center text-xs text-slate-500">ยังไม่มีข้อมูลปีงบประมาณในระบบ</div>`;
+        return;
+    }
+
+    container.innerHTML = years.map(fy => {
+        const isCur = fy.is_current == 1;
+        const isSelected = selectedYearId == fy.id;
+        return `
+            <div class="p-3.5 flex items-center justify-between hover:bg-slate-50 transition">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl ${isCur ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'} flex items-center justify-center font-black text-sm">
+                        ${fy.year}
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-extrabold text-slate-900">ปีงบประมาณ พ.ศ. ${fy.year}</span>
+                            ${isCur ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">ปีปัจจุบัน</span>' : ''}
+                            ${isSelected ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">กำลังทำงาน</span>' : ''}
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">${fy.start_date || '-'} ถึง ${fy.end_date || '-'}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    ${!isCur ? `
+                        <button type="button" onclick="setFiscalYearCurrent(${fy.id})" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200 transition">
+                            ตั้งเป็นปีปัจจุบัน
+                        </button>
+                    ` : ''}
+                    <button type="button" onclick="onFiscalYearChange(${fy.id}); closeFiscalYearModal();" class="px-3 py-1.5 ${isSelected ? 'bg-slate-200 text-slate-700' : 'bg-blue-600 hover:bg-blue-700 text-white'} text-xs font-bold rounded-lg transition">
+                        ${isSelected ? 'กำลังดูอยู่นี้' : 'เลือกดูปีนี้'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function setFiscalYearCurrent(yearId) {
+    try {
+        const res = await fetch('/api/plan/save_fiscal_year.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'set_current', id: yearId })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            showToast(data.message, 'success');
+            selectedYearId = yearId;
+            await loadData(yearId);
+            renderFiscalYearsListModal();
+        } else {
+            showToast(data.message || 'เกิดข้อผิดพลาดในการตั้งปีงบประมาณ', 'error');
+        }
+    } catch (err) {
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: ' + err.message, 'error');
+    }
 }
 
 async function handleFiscalYearSubmit(e) {
     e.preventDefault();
+    const btn = document.getElementById('btnSaveFiscalYear');
+    if (btn) btn.disabled = true;
+
     const payload = {
         year: document.getElementById('new_fy_year').value.trim(),
         start_date: document.getElementById('new_fy_start').value,
@@ -531,21 +632,26 @@ async function handleFiscalYearSubmit(e) {
         const data = await res.json();
         if (data.status === 'success') {
             closeFiscalYearModal();
-            showToast(`สร้างปีงบประมาณ พ.ศ. ${payload.year} เรียบร้อย`, 'success');
+            showToast(data.message || `สร้างปีงบประมาณ พ.ศ. ${payload.year} เรียบร้อย`, 'success');
+            selectedYearId = data.year_id || selectedYearId;
             await loadData(selectedYearId);
+        } else {
+            showToast(data.message || 'ไม่สามารถบันทึกปีงบประมาณได้', 'error');
         }
     } catch (err) {
-        console.error(err);
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: ' + err.message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
 // 6. 100% Department Allocation (5 Channels & Utility Reserve)
 const ALLOC_DEPT_DEFAULTS = [
-    { department: 'academic', department_name: 'งานบริหารงานวิชาการ', badge: 'กลุ่มบริหารวิชาการ', defaultPct: 45.0, icon: 'book-open', color: 'indigo' },
-    { department: 'personnel', department_name: 'งานบุคคล', badge: 'กลุ่มบริหารงานบุคคล', defaultPct: 10.0, icon: 'users', color: 'blue' },
-    { department: 'budget', department_name: 'งานงบประมาณ', badge: 'กลุ่มบริหารงบประมาณ', defaultPct: 10.0, icon: 'wallet', color: 'emerald' },
-    { department: 'general', department_name: 'งานบริหารงานทั่วไป', badge: 'กลุ่มบริหารทั่วไป', defaultPct: 20.0, icon: 'building-2', color: 'amber' },
-    { department: 'reserve', department_name: 'กันไว้สำหรับค่าใช้จ่ายอื่นๆ', badge: 'งบอื่นๆ/สำรองจ่าย', defaultPct: 15.0, icon: 'shield-alert', color: 'purple' }
+    { department: 'academic', department_name: 'งานบริหารงานวิชาการ', badge: 'กลุ่มบริหารวิชาการ', defaultPct: 45.0, icon: 'book-open', color: 'indigo', barHex: '#4f46e5', lightBg: 'bg-indigo-50', textCol: 'text-indigo-700', borderCol: 'border-indigo-200' },
+    { department: 'personnel', department_name: 'งานบุคคล', badge: 'กลุ่มบริหารงานบุคคล', defaultPct: 10.0, icon: 'users', color: 'blue', barHex: '#2563eb', lightBg: 'bg-blue-50', textCol: 'text-blue-700', borderCol: 'border-blue-200' },
+    { department: 'budget', department_name: 'งานงบประมาณ', badge: 'กลุ่มบริหารงบประมาณ', defaultPct: 10.0, icon: 'wallet', color: 'emerald', barHex: '#059669', lightBg: 'bg-emerald-50', textCol: 'text-emerald-700', borderCol: 'border-emerald-200' },
+    { department: 'general', department_name: 'งานบริหารงานทั่วไป', badge: 'กลุ่มบริหารทั่วไป', defaultPct: 20.0, icon: 'building-2', color: 'amber', barHex: '#d97706', lightBg: 'bg-amber-50', textCol: 'text-amber-700', borderCol: 'border-amber-200' },
+    { department: 'reserve', department_name: 'กันไว้สำหรับค่าใช้จ่ายอื่นๆ', badge: 'งบอื่นๆ/สำรองจ่าย', defaultPct: 15.0, icon: 'shield-alert', color: 'purple', barHex: '#9333ea', lightBg: 'bg-purple-50', textCol: 'text-purple-700', borderCol: 'border-purple-200' }
 ];
 
 function getAllocatableBudget() {
@@ -558,12 +664,12 @@ function getAllocatableBudget() {
 
 function renderAllocationsCards() {
     const container = document.getElementById('allocationCardsContainer');
-    if (!container || !appData) return;
+    if (!container) return;
 
     // 1. Sync Budget Base & Utility Reserve inputs
-    const cfg = appData.budgetConfig || {};
-    const calcTotal = cfg.calculatedSubsidyTotal ?? (appData.subsidiesSummary?.grand_total || 0);
-    let totalBudgetBase = cfg.totalBudgetBase ?? (appData.summary?.totalBudgetReceived || calcTotal);
+    const cfg = appData?.budgetConfig || {};
+    const calcTotal = cfg.calculatedSubsidyTotal ?? (appData?.subsidiesSummary?.grand_total || 0);
+    let totalBudgetBase = cfg.totalBudgetBase ?? (appData?.summary?.totalBudgetReceived || calcTotal);
     if (totalBudgetBase <= 0 && calcTotal > 0) totalBudgetBase = calcTotal;
 
     const utilityReserve = cfg.utilityReserve ?? 0;
@@ -580,7 +686,7 @@ function renderAllocationsCards() {
     if (calcRefText) calcRefText.innerText = 'ยอดจากการคำนวณรายหัว & กพพ.: ' + formatBaht(calcTotal) + ' บาท';
 
     // 2. Prepare 5 allocation items
-    let allocs = Array.isArray(appData.departmentAllocations) && appData.departmentAllocations.length > 0 
+    let allocs = Array.isArray(appData?.departmentAllocations) && appData.departmentAllocations.length > 0 
         ? [...appData.departmentAllocations] 
         : [];
 
@@ -608,67 +714,78 @@ function renderAllocationsCards() {
         return a;
     });
 
-    appData.departmentAllocations = allocs;
+    if (appData) appData.departmentAllocations = allocs;
     const allocatable = getAllocatableBudget();
 
-    // 3. Render cards
+    // 3. Render 5 Cards with percentage slider, numeric input, and baht input
     container.innerHTML = allocs.map((a, idx) => {
         const def = ALLOC_DEPT_DEFAULTS.find(d => d.department === a.department) || ALLOC_DEPT_DEFAULTS[idx] || ALLOC_DEPT_DEFAULTS[0];
         const pct = parseFloat(a.percentage) || 0;
-        const amt = a.allocated_amount > 0 ? a.allocated_amount : (pct / 100) * allocatable;
+        const amt = a.allocated_amount > 0 ? parseFloat(a.allocated_amount) : ((pct / 100) * allocatable);
 
         return `
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-blue-300 transition group">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-blue-400 transition group space-y-4">
             <div>
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-xl bg-${def.color}-50 text-${def.color}-600 flex items-center justify-center font-bold">
+                        <div class="w-9 h-9 rounded-xl ${def.lightBg} ${def.textCol} flex items-center justify-center font-bold">
                             <i data-lucide="${def.icon}" class="w-4 h-4"></i>
                         </div>
                         <div>
-                            <h3 class="text-sm font-bold text-slate-900">${a.department_name}</h3>
+                            <h4 class="text-xs font-bold text-slate-900">${a.department_name}</h4>
                             <span class="text-[10px] font-bold text-slate-400">${def.badge}</span>
                         </div>
                     </div>
-                    <span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">ช่องที่ ${idx + 1}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${def.lightBg} ${def.textCol} border ${def.borderCol}">ช่องที่ ${idx + 1}</span>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">สัดส่วน (%)</label>
-                        <div class="relative">
+                <!-- Percentage Input & Range Slider -->
+                <div class="space-y-2 mt-3">
+                    <div class="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                        <label for="alloc_pct_${a.department}" class="flex items-center gap-1">
+                            <span>สัดส่วนเปอร์เซ็นต์ (%):</span>
+                        </label>
+                        <div class="relative w-24">
                             <input type="number" step="0.01" min="0" max="100" 
                                    id="alloc_pct_${a.department}" 
                                    data-dept="${a.department}"
                                    data-id="${a.id}"
                                    value="${pct.toFixed(2)}" 
                                    oninput="onAllocPercentageInput('${a.department}')"
-                                   class="w-full pl-3 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-extrabold text-blue-900 outline-none focus:bg-white focus:border-blue-500">
-                            <span class="absolute right-2.5 top-2.5 text-xs font-bold text-slate-400">%</span>
+                                   class="w-full pl-2.5 pr-6 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-extrabold text-blue-900 outline-none focus:bg-white focus:border-blue-500 text-right">
+                            <span class="absolute right-2 top-1.5 text-xs font-bold text-slate-400">%</span>
                         </div>
                     </div>
 
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">จำนวนเงิน (บาท)</label>
-                        <div class="relative">
-                            <input type="number" step="100" min="0" 
-                                   id="alloc_amt_input_${a.department}" 
-                                   data-dept="${a.department}"
-                                   value="${amt.toFixed(2)}" 
-                                   oninput="onAllocAmountInput('${a.department}')"
-                                   class="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-emerald-500">
-                            <span class="absolute right-2.5 top-2.5 text-[11px] font-bold text-slate-400">฿</span>
-                        </div>
+                    <!-- Slider for quick percentage drag -->
+                    <input type="range" min="0" max="100" step="0.5" 
+                           id="alloc_slider_${a.department}"
+                           value="${pct}" 
+                           oninput="onAllocSliderInput('${a.department}', this.value)"
+                           class="w-full accent-blue-600 cursor-pointer h-1.5 bg-slate-100 rounded-lg">
+                </div>
+
+                <!-- Baht Amount Input -->
+                <div class="space-y-1.5 mt-3">
+                    <label class="block text-[11px] font-bold text-slate-600">จำนวนเงินจัดสรร (บาท):</label>
+                    <div class="relative">
+                        <input type="number" step="100" min="0" 
+                               id="alloc_amt_input_${a.department}" 
+                               data-dept="${a.department}"
+                               value="${amt.toFixed(2)}" 
+                               oninput="onAllocAmountInput('${a.department}')"
+                               class="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-emerald-500">
+                        <span class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">฿</span>
                     </div>
                 </div>
 
-                <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>คำนวณได้สุทธิ:</span>
+                <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span>ยอดคำนวณสุทธิ:</span>
                     <span class="font-extrabold text-slate-800" id="alloc_amt_${a.department}">${formatBaht(amt)} บาท</span>
                 </div>
             </div>
 
-            <div class="mt-4 pt-3 border-t border-slate-100">
+            <div class="pt-2 border-t border-slate-100">
                 <input type="text" id="alloc_notes_${a.department}" value="${a.notes || ''}" placeholder="หมายเหตุ / วัตถุประสงค์งบช่องนี้..." 
                        class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-blue-400">
             </div>
@@ -715,11 +832,13 @@ function onBudgetBaseChanged() {
     // Recalculate amounts for each department based on its current percentage
     ALLOC_DEPT_DEFAULTS.forEach(def => {
         const pctInput = document.getElementById(`alloc_pct_${def.department}`);
+        const slider = document.getElementById(`alloc_slider_${def.department}`);
         const amtInput = document.getElementById(`alloc_amt_input_${def.department}`);
         const amtDisplay = document.getElementById(`alloc_amt_${def.department}`);
 
         if (pctInput) {
             const pct = parseFloat(pctInput.value) || 0;
+            if (slider) slider.value = pct;
             const amt = (pct / 100) * allocatable;
             if (amtInput) amtInput.value = amt.toFixed(2);
             if (amtDisplay) amtDisplay.innerText = `${formatBaht(amt)} บาท`;
@@ -729,14 +848,22 @@ function onBudgetBaseChanged() {
     validateAllocationsSum();
 }
 
+function onAllocSliderInput(dept, val) {
+    const pctInput = document.getElementById(`alloc_pct_${dept}`);
+    if (pctInput) pctInput.value = parseFloat(val).toFixed(2);
+    onAllocPercentageInput(dept);
+}
+
 function onAllocPercentageInput(dept) {
     const allocatable = getAllocatableBudget();
     const pctInput = document.getElementById(`alloc_pct_${dept}`);
+    const slider = document.getElementById(`alloc_slider_${dept}`);
     const amtInput = document.getElementById(`alloc_amt_input_${dept}`);
     const amtDisplay = document.getElementById(`alloc_amt_${dept}`);
 
     if (pctInput) {
         const pct = parseFloat(pctInput.value) || 0;
+        if (slider) slider.value = pct;
         const amt = (pct / 100) * allocatable;
         if (amtInput) amtInput.value = amt.toFixed(2);
         if (amtDisplay) amtDisplay.innerText = `${formatBaht(amt)} บาท`;
@@ -747,6 +874,7 @@ function onAllocPercentageInput(dept) {
 function onAllocAmountInput(dept) {
     const allocatable = getAllocatableBudget();
     const pctInput = document.getElementById(`alloc_pct_${dept}`);
+    const slider = document.getElementById(`alloc_slider_${dept}`);
     const amtInput = document.getElementById(`alloc_amt_input_${dept}`);
     const amtDisplay = document.getElementById(`alloc_amt_${dept}`);
 
@@ -755,6 +883,7 @@ function onAllocAmountInput(dept) {
         if (allocatable > 0) {
             const pct = (amt / allocatable) * 100;
             if (pctInput) pctInput.value = pct.toFixed(2);
+            if (slider) slider.value = pct;
         }
         if (amtDisplay) amtDisplay.innerText = `${formatBaht(amt)} บาท`;
     }
@@ -765,6 +894,7 @@ function applyPresetAllocation(preset) {
     const presets = {
         standard: { academic: 45.0, personnel: 10.0, budget: 10.0, general: 20.0, reserve: 15.0 },
         academic: { academic: 55.0, personnel: 10.0, budget: 5.0, general: 15.0, reserve: 15.0 },
+        balanced: { academic: 35.0, personnel: 15.0, budget: 15.0, general: 20.0, reserve: 15.0 },
         equal: { academic: 20.0, personnel: 20.0, budget: 20.0, general: 20.0, reserve: 20.0 }
     };
 
@@ -773,11 +903,128 @@ function applyPresetAllocation(preset) {
 
     Object.keys(target).forEach(dept => {
         const pctInput = document.getElementById(`alloc_pct_${dept}`);
+        const slider = document.getElementById(`alloc_slider_${dept}`);
         if (pctInput) pctInput.value = target[dept].toFixed(2);
+        if (slider) slider.value = target[dept];
     });
 
     onBudgetBaseChanged();
-    showToast(`ใช้สัดส่วนจัดสรรรูปแบบ "${preset === 'standard' ? 'สพฐ. มาตรฐาน' : preset === 'academic' ? 'เน้นวิชาการ' : 'หารเท่ากัน 5 ช่อง'}" แล้ว`, 'info');
+    const labels = {
+        standard: 'สพฐ. มาตรฐาน (45-10-10-20-15)',
+        academic: 'เน้นวิชาการ (55-10-5-15-15)',
+        balanced: 'สมดุล 4 กลุ่มงาน (35-15-15-20-15)',
+        equal: 'หารเท่ากัน 5 ช่อง (20% ทุกช่อง)'
+    };
+    showToast(`ใช้สัดส่วนจัดสรรรูปแบบ "${labels[preset] || preset}" เรียบร้อยแล้ว`, 'info');
+}
+
+function autoBalanceAllocation() {
+    let sumOther = 0;
+    ALLOC_DEPT_DEFAULTS.forEach(def => {
+        if (def.department !== 'reserve') {
+            const input = document.getElementById(`alloc_pct_${def.department}`);
+            if (input) sumOther += (parseFloat(input.value) || 0);
+        }
+    });
+
+    const remainder = Math.max(0, parseFloat((100 - sumOther).toFixed(2)));
+    const reserveInput = document.getElementById('alloc_pct_reserve');
+    const reserveSlider = document.getElementById('alloc_slider_reserve');
+    if (reserveInput) reserveInput.value = remainder.toFixed(2);
+    if (reserveSlider) reserveSlider.value = remainder;
+
+    onBudgetBaseChanged();
+    showToast(`ปรับสัดส่วนงบอื่นๆ ให้รวมครบ 100.00% แล้ว (${remainder.toFixed(2)}%)`, 'info');
+}
+
+function updateStackedBar(allocatable) {
+    const bar = document.getElementById('allocStackedBar');
+    const legend = document.getElementById('allocLegendContainer');
+    const barSumText = document.getElementById('stackedBarSumText');
+    if (!bar) return;
+
+    let barHtml = '';
+    let legendHtml = '';
+    let totalPct = 0;
+
+    ALLOC_DEPT_DEFAULTS.forEach(def => {
+        const pctInput = document.getElementById(`alloc_pct_${def.department}`);
+        const pct = pctInput ? parseFloat(pctInput.value) || 0 : 0;
+        totalPct += pct;
+        const amt = (pct / 100) * allocatable;
+
+        if (pct > 0) {
+            barHtml += `
+                <div style="width: ${pct}%; background-color: ${def.barHex};" 
+                     class="h-full transition-all duration-300 relative group flex items-center justify-center text-[10px] text-white font-extrabold" 
+                     title="${def.department_name}: ${pct.toFixed(2)}% (${formatBaht(amt)} บ.)">
+                    ${pct >= 8 ? `${pct.toFixed(0)}%` : ''}
+                </div>
+            `;
+        }
+
+        legendHtml += `
+            <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${def.barHex};"></span>
+                <span class="text-slate-600 font-semibold">${def.department_name}:</span>
+                <span class="font-extrabold text-slate-900">${pct.toFixed(1)}%</span>
+            </div>
+        `;
+    });
+
+    bar.innerHTML = barHtml;
+    if (legend) legend.innerHTML = legendHtml;
+    if (barSumText) barSumText.innerText = `รวม ${totalPct.toFixed(2)}%`;
+}
+
+function renderAllocationSummaryTable(allocatable) {
+    const tbody = document.getElementById('allocationSummaryTableBody');
+    if (!tbody) return;
+
+    let totalPct = 0;
+    let totalAmt = 0;
+
+    const rows = ALLOC_DEPT_DEFAULTS.map((def, idx) => {
+        const pctInput = document.getElementById(`alloc_pct_${def.department}`);
+        const notesInput = document.getElementById(`alloc_notes_${def.department}`);
+        const pct = pctInput ? parseFloat(pctInput.value) || 0 : 0;
+        const amt = (pct / 100) * allocatable;
+        const notes = notesInput ? notesInput.value.trim() : '';
+
+        totalPct += pct;
+        totalAmt += amt;
+
+        return `
+            <tr class="hover:bg-slate-50 transition">
+                <td class="p-3 text-center text-slate-500 font-bold">${idx + 1}</td>
+                <td class="p-3 flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${def.barHex};"></span>
+                    <span class="font-bold text-slate-900">${def.department_name}</span>
+                </td>
+                <td class="p-3 text-center font-extrabold text-blue-900">${pct.toFixed(2)}%</td>
+                <td class="p-3 text-right font-extrabold text-slate-900">${formatBaht(amt)} บาท</td>
+                <td class="p-3 text-slate-600 text-[11px]">${notes || '-'}</td>
+            </tr>
+        `;
+    }).join('');
+
+    tbody.innerHTML = rows;
+
+    const tablePct = document.getElementById('allocTableTotalPct');
+    const tableAmt = document.getElementById('allocTableTotalAmt');
+    const tableNote = document.getElementById('allocTableStatusNote');
+
+    if (tablePct) tablePct.innerText = `${totalPct.toFixed(2)}%`;
+    if (tableAmt) tableAmt.innerText = `${formatBaht(totalAmt)} บาท`;
+    if (tableNote) {
+        if (Math.abs(totalPct - 100) < 0.05) {
+            tableNote.innerText = '✓ สัดส่วนครบ 100% พอดี';
+            tableNote.className = 'p-3 text-emerald-600 font-bold';
+        } else {
+            tableNote.innerText = totalPct > 100 ? `เกิน ${(totalPct - 100).toFixed(2)}%` : `ยังขาด ${(100 - totalPct).toFixed(2)}%`;
+            tableNote.className = 'p-3 text-amber-600 font-bold';
+        }
+    }
 }
 
 function validateAllocationsSum() {
@@ -805,6 +1052,9 @@ function validateAllocationsSum() {
     if (badge) badge.innerText = `${sumPct.toFixed(2)}%`;
     if (amtBadge) amtBadge.innerText = `${formatBaht(sumAmt)} บาท`;
     if (sumNotice) sumNotice.innerText = `รวม ${sumPct.toFixed(2)}% (${formatBaht(sumAmt)} บ.)`;
+
+    updateStackedBar(allocatable);
+    renderAllocationSummaryTable(allocatable);
 
     if (!banner) return;
 
@@ -852,7 +1102,7 @@ async function saveAllocations() {
         const notes = notesInput ? notesInput.value.trim() : '';
         const amt = (pct / 100) * allocatable;
 
-        const existing = (appData.departmentAllocations || []).find(a => a.department === def.department);
+        const existing = (appData?.departmentAllocations || []).find(a => a.department === def.department);
 
         return {
             id: existing ? existing.id : 0,
@@ -866,7 +1116,7 @@ async function saveAllocations() {
 
     const sumPct = allocationsToSave.reduce((s, a) => s + a.percentage, 0);
     if (Math.abs(sumPct - 100) > 0.05) {
-        alert(`สัดส่วนรวมต้องเท่ากับ 100.00% พอดี (ปัจจุบันได้ ${sumPct.toFixed(2)}%)\nกรุณาปรับสัดส่วนให้ครบ 100% ก่อนบันทึก`);
+        showToast(`สัดส่วนรวมต้องเท่ากับ 100.00% พอดี (ปัจจุบันได้ ${sumPct.toFixed(2)}%)\nกรุณาปรับสัดส่วนให้ครบ 100% ก่อนบันทึก`, 'error');
         return;
     }
 
@@ -891,8 +1141,7 @@ async function saveAllocations() {
             showToast(data.message || 'เกิดข้อผิดพลาดในการบันทึก', 'error');
         }
     } catch (err) {
-        console.error(err);
-        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: ' + err.message, 'error');
     }
 }
 

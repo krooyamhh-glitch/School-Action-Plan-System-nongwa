@@ -63,7 +63,7 @@ try {
     }
 
     // บุคลากรในสถานศึกษา
-    $stmt_users = $pdo->query("SELECT id, name, username, id_card, position, department, role, phone, email, status FROM users ORDER BY id ASC");
+    $stmt_users = $pdo->query("SELECT id, name, username, id_card, position, department, role, phone, email, is_approved, COALESCE(status, 'active') as status FROM users ORDER BY id ASC");
     $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     // แหล่งงบประมาณ
