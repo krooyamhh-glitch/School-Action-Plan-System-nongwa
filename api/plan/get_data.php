@@ -8,29 +8,41 @@ if (!$pdo) {
 }
 
 try {
+    ensureDatabaseIntegrity($pdo);
+
     $selectedYearId = isset($_GET['year_id']) ? (int)$_GET['year_id'] : 0;
     
-    // ดึงปีงบประมาณทั้งหมด
-    $stmt_years = $pdo->query("SELECT * FROM fiscal_years ORDER BY year DESC");
+    // ดึงปีงบประมาณทั้งหมดอย่างปลอดภัย ตรวจสอบคอลัมน์ year หรือ year_be
+    $colsFy = $pdo->query("SHOW COLUMNS FROM `fiscal_years`")->fetchAll(PDO::FETCH_COLUMN);
+    $orderBy = in_array('year', $colsFy) ? "year DESC, id DESC" : (in_array('year_be', $colsFy) ? "year_be DESC, id DESC" : "id DESC");
+    $stmt_years = $pdo->query("SELECT * FROM fiscal_years ORDER BY $orderBy");
     $fiscalYears = $stmt_years->fetchAll(PDO::FETCH_ASSOC);
 
     // หากยังไม่มีปีงบประมาณเลย ให้สร้างปีงบประมาณเริ่มต้น พ.ศ. 2568
     if (empty($fiscalYears)) {
         $stmtInitYear = $pdo->prepare("
             INSERT INTO fiscal_years (
-                school_id, year, start_date, end_date, is_current, status, 
+                school_id, year, year_be, start_date, end_date, is_current, status, 
                 total_budget_base, utility_reserve, utility_reserve_notes, allocatable_budget
             ) VALUES (
-                1, '2568', '2024-10-01', '2025-09-30', 1, 'active',
+                1, '2568', 2568, '2024-10-01', '2025-09-30', 1, 'active',
                 0.00, 0.00, 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)', 0.00
             )
         ");
         $stmtInitYear->execute();
         $selectedYearId = (int)$pdo->lastInsertId();
 
-        $stmt_years = $pdo->query("SELECT * FROM fiscal_years ORDER BY year DESC");
+        $stmt_years = $pdo->query("SELECT * FROM fiscal_years ORDER BY $orderBy");
         $fiscalYears = $stmt_years->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    // ทำความสะอาดและกำหนดค่า year ให้แน่ใจว่ามีเสมอ
+    foreach ($fiscalYears as &$fyItem) {
+        if (!isset($fyItem['year']) || empty($fyItem['year'])) {
+            $fyItem['year'] = (string)($fyItem['year_be'] ?? $fyItem['fiscal_year'] ?? (2567 + (int)$fyItem['id']));
+        }
+    }
+    unset($fyItem);
 
     if ($selectedYearId === 0 && !empty($fiscalYears)) {
         foreach ($fiscalYears as $y) {

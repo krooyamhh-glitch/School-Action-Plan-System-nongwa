@@ -2221,9 +2221,18 @@ async function saveSubsidyDataOnly() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        const result = await res.json();
+        const text = await res.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (jsonErr) {
+            console.error('Non-JSON response from save_subsidy_data:', text);
+            showToast('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์ (' + res.status + '): ' + (text.slice(0, 80) || res.statusText), 'error');
+            return false;
+        }
+
         if (result.status === 'success') {
-            showToast('บันทึกข้อมูลนักเรียน เงินอุดหนุนรายหัว และเงินเพิ่ม รร.ขนาดเล็ก สำเร็จ', 'success');
+            showToast(result.message || 'บันทึกข้อมูลนักเรียน เงินอุดหนุนรายหัว และเงินเพิ่ม รร.ขนาดเล็ก สำเร็จ', 'success');
             return true;
         } else {
             showToast(result.message || 'บันทึกไม่สำเร็จ', 'error');
@@ -2231,7 +2240,7 @@ async function saveSubsidyDataOnly() {
         }
     } catch (err) {
         console.error(err);
-        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: ' + (err.message || ''), 'error');
         return false;
     }
 }
@@ -2246,9 +2255,18 @@ async function applySubsidiesToBudget() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fiscal_year_id: selectedYearId })
         });
-        const result = await res.json();
+        const text = await res.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (jsonErr) {
+            console.error('Non-JSON response from apply_subsidies_to_budget:', text);
+            showToast('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์ (' + res.status + '): ' + (text.slice(0, 80) || res.statusText), 'error');
+            return;
+        }
+
         if (result.status === 'success') {
-            showToast('นำยอดเงินคำนวณเข้าเป็นแหล่งงบประมาณ และเตรียมจัดสรร 5 ช่องงาน เรียบร้อยแล้ว', 'success');
+            showToast(result.message || 'นำยอดเงินคำนวณเข้าเป็นแหล่งงบประมาณ และเตรียมจัดสรร 5 ช่องงาน เรียบร้อยแล้ว', 'success');
             await loadData(selectedYearId);
             switchTab('allocation');
         } else {
@@ -2256,7 +2274,7 @@ async function applySubsidiesToBudget() {
         }
     } catch (err) {
         console.error(err);
-        showToast('เกิดข้อผิดพลาดในการประมวลผล', 'error');
+        showToast('เกิดข้อผิดพลาดในการประมวลผล: ' + (err.message || ''), 'error');
     }
 }
 

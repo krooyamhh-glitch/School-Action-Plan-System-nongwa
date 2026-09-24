@@ -71,25 +71,26 @@ try {
 
         if (!$hasSources) {
             $stmtInsertSrc = $pdo->prepare("
-                INSERT INTO budget_sources (fiscal_year_id, code, name, category, amount, description) 
-                VALUES (?, 'SRC-01', 'งบประมาณที่กำหนดสำหรับจัดสรร', 'subsidy', ?, 'กำหนดโดยผู้ใช้')
+                INSERT INTO budget_sources (school_id, fiscal_year_id, code, name, category, amount, description) 
+                VALUES (1, ?, 'SRC-01', 'งบประมาณที่กำหนดสำหรับจัดสรร', 'subsidy', ?, 'กำหนดโดยผู้ใช้')
             ");
             $stmtInsertSrc->execute([$fiscal_year_id, $total_budget_base]);
         }
     }
 
     // 3. จัดการบันทึก department_allocations (ทั้ง 5 ช่อง)
-    $stmtUpsert = $pdo->prepare("
+    $stmtFindAlloc = $pdo->prepare("SELECT id FROM department_allocations WHERE fiscal_year_id = ? AND department = ? LIMIT 1");
+    $stmtUpdateAlloc = $pdo->prepare("
+        UPDATE department_allocations 
+        SET department_name = ?, percentage = ?, allocated_amount = ?, notes = ?
+        WHERE id = ?
+    ");
+    $stmtInsertAlloc = $pdo->prepare("
         INSERT INTO department_allocations (
             school_id, fiscal_year_id, department, department_name, percentage, allocated_amount, notes
         ) VALUES (
             1, ?, ?, ?, ?, ?, ?
         )
-        ON DUPLICATE KEY UPDATE
-            department_name = VALUES(department_name),
-            percentage = VALUES(percentage),
-            allocated_amount = VALUES(allocated_amount),
-            notes = VALUES(notes)
     ");
 
     foreach ($allocations as $a) {
@@ -99,14 +100,14 @@ try {
         $amt = (float)($a['allocated_amount'] ?? (($pct / 100) * $allocatableBudget));
         $notes = $a['notes'] ?? '';
 
-        $stmtUpsert->execute([
-            $fiscal_year_id,
-            $deptKey,
-            $deptName,
-            $pct,
-            $amt,
-            $notes
-        ]);
+        $stmtFindAlloc->execute([$fiscal_year_id, $deptKey]);
+        $existingAlloc = $stmtFindAlloc->fetch(PDO::FETCH_ASSOC);
+
+        if ($existingAlloc) {
+            $stmtUpdateAlloc->execute([$deptName, $pct, $amt, $notes, $existingAlloc['id']]);
+        } else {
+            $stmtInsertAlloc->execute([$fiscal_year_id, $deptKey, $deptName, $pct, $amt, $notes]);
+        }
     }
 
     $pdo->commit();
@@ -119,8 +120,8 @@ try {
         'allocatable_budget' => $allocatableBudget
     ], JSON_UNESCAPED_UNICODE);
 
-} catch (PDOException $e) {
-    if ($pdo->inTransaction()) {
+} catch (\Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
     http_response_code(500);

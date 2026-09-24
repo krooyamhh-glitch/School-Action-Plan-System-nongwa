@@ -58,40 +58,42 @@ try {
         $pdo->query("UPDATE fiscal_years SET is_current = 0");
     }
 
+    $yearBe = !empty($year) ? (int)$year : 2568;
+
     // กรณีแก้ไขปีงบประมาณเดิม
     if ($year_id > 0) {
         $stmtUp = $pdo->prepare("
             UPDATE fiscal_years 
-            SET year = ?, start_date = ?, end_date = ?, is_current = ?, status = ?
+            SET year = ?, year_be = ?, start_date = ?, end_date = ?, is_current = ?, status = ?
             WHERE id = ?
         ");
-        $stmtUp->execute([$year, $start_date, $end_date, $is_current, $status, $year_id]);
+        $stmtUp->execute([$year, $yearBe, $start_date, $end_date, $is_current, $status, $year_id]);
         $targetYearId = $year_id;
     } else {
         // ตรวจสอบว่ามีปีนี้อยู่แล้วหรือไม่
-        $stmtCheck = $pdo->prepare("SELECT id FROM fiscal_years WHERE year = ? LIMIT 1");
-        $stmtCheck->execute([$year]);
+        $stmtCheck = $pdo->prepare("SELECT id FROM fiscal_years WHERE year = ? OR year_be = ? LIMIT 1");
+        $stmtCheck->execute([$year, $yearBe]);
         $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
         if ($existing) {
             $targetYearId = (int)$existing['id'];
             $stmtUp = $pdo->prepare("
                 UPDATE fiscal_years 
-                SET start_date = ?, end_date = ?, is_current = ?, status = ?
+                SET year = ?, year_be = ?, start_date = ?, end_date = ?, is_current = ?, status = ?
                 WHERE id = ?
             ");
-            $stmtUp->execute([$start_date, $end_date, $is_current, $status, $targetYearId]);
+            $stmtUp->execute([$year, $yearBe, $start_date, $end_date, $is_current, $status, $targetYearId]);
         } else {
             $stmtIn = $pdo->prepare("
                 INSERT INTO fiscal_years (
-                    school_id, year, start_date, end_date, is_current, status, 
+                    school_id, year, year_be, start_date, end_date, is_current, status, 
                     total_budget_base, utility_reserve, utility_reserve_notes, allocatable_budget
                 ) VALUES (
-                    1, ?, ?, ?, ?, ?,
+                    1, ?, ?, ?, ?, ?, ?,
                     0.00, 0.00, 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)', 0.00
                 )
             ");
-            $stmtIn->execute([$year, $start_date, $end_date, $is_current, $status]);
+            $stmtIn->execute([$year, $yearBe, $start_date, $end_date, $is_current, $status]);
             $targetYearId = (int)$pdo->lastInsertId();
         }
     }

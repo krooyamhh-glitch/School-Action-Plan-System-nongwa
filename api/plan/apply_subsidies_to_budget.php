@@ -60,7 +60,7 @@ try {
         $stmtUp1 = $pdo->prepare("UPDATE budget_sources SET name = ?, amount = ? WHERE id = ?");
         $stmtUp1->execute([$subsidyName, $totalSubsidy, $src1['id']]);
     } else {
-        $stmtIn1 = $pdo->prepare("INSERT INTO budget_sources (fiscal_year_id, code, name, category, amount) VALUES (?, 'SUB-01', ?, 'subsidy', ?)");
+        $stmtIn1 = $pdo->prepare("INSERT INTO budget_sources (school_id, fiscal_year_id, code, name, category, amount) VALUES (1, ?, 'SUB-01', ?, 'subsidy', ?)");
         $stmtIn1->execute([$fiscal_year_id, $subsidyName, $totalSubsidy]);
     }
 
@@ -77,7 +77,7 @@ try {
         $stmtUp2 = $pdo->prepare("UPDATE budget_sources SET amount = ? WHERE id = ?");
         $stmtUp2->execute([$totalDev, $src2['id']]);
     } else {
-        $stmtIn2 = $pdo->prepare("INSERT INTO budget_sources (fiscal_year_id, code, name, category, amount) VALUES (?, 'DEV-01', 'เงินกิจกรรมพัฒนาคุณภาพผู้เรียน (กพพ. 4 กิจกรรมหลัก)', 'student_dev', ?)");
+        $stmtIn2 = $pdo->prepare("INSERT INTO budget_sources (school_id, fiscal_year_id, code, name, category, amount) VALUES (1, ?, 'DEV-01', 'เงินกิจกรรมพัฒนาคุณภาพผู้เรียน (กพพ. 4 กิจกรรมหลัก)', 'student_dev', ?)");
         $stmtIn2->execute([$fiscal_year_id, $totalDev]);
     }
 
@@ -119,8 +119,8 @@ try {
         'allocatable_budget' => $allocatableBudget
     ], JSON_UNESCAPED_UNICODE);
 
-} catch (PDOException $e) {
-    if ($pdo->inTransaction()) {
+} catch (\Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
     http_response_code(500);
