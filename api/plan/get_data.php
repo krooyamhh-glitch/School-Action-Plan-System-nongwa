@@ -25,16 +25,23 @@ try {
 
     // หากยังไม่มีปีงบประมาณเลย ให้สร้างปีงบประมาณเริ่มต้น พ.ศ. 2568
     if (empty($fiscalYears)) {
-        $stmtInitYear = $pdo->prepare("
-            INSERT INTO fiscal_years (
-                school_id, year, year_be, start_date, end_date, is_current, status, 
-                total_budget_base, utility_reserve, utility_reserve_notes, allocatable_budget
-            ) VALUES (
-                1, '2568', 2568, '2024-10-01', '2025-09-30', 1, 'active',
-                0.00, 0.00, 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)', 0.00
-            )
-        ");
-        $stmtInitYear->execute();
+        $fyCols = getTableColumns($pdo, 'fiscal_years');
+        $insCols = ["`start_date`", "`end_date`", "`is_current`", "`status`"];
+        $insVals = ['2024-10-01', '2025-09-30', 1, 'active'];
+
+        if (in_array('school_id', $fyCols)) { $insCols[] = "`school_id`"; $insVals[] = 1; }
+        if (in_array('year', $fyCols)) { $insCols[] = "`year`"; $insVals[] = '2568'; }
+        if (in_array('year_be', $fyCols)) { $insCols[] = "`year_be`"; $insVals[] = 2568; }
+        if (in_array('fiscal_year', $fyCols)) { $insCols[] = "`fiscal_year`"; $insVals[] = 2568; }
+        if (in_array('total_budget_base', $fyCols)) { $insCols[] = "`total_budget_base`"; $insVals[] = 0.00; }
+        if (in_array('utility_reserve', $fyCols)) { $insCols[] = "`utility_reserve`"; $insVals[] = 0.00; }
+        if (in_array('utility_reserve_notes', $fyCols)) { $insCols[] = "`utility_reserve_notes`"; $insVals[] = 'กันไว้สำหรับค่าสาธารณูปโภค (ค่าน้ำ ค่าไฟ)'; }
+        if (in_array('allocatable_budget', $fyCols)) { $insCols[] = "`allocatable_budget`"; $insVals[] = 0.00; }
+
+        $placeholders = array_fill(0, count($insCols), '?');
+        $sqlInitYear = "INSERT INTO `fiscal_years` (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        $stmtInitYear = $pdo->prepare($sqlInitYear);
+        $stmtInitYear->execute($insVals);
         $selectedYearId = (int)$pdo->lastInsertId();
 
         $stmt_years = $pdo->query("SELECT * FROM fiscal_years ORDER BY $orderBy");

@@ -17,8 +17,19 @@ if ($fiscal_year_id <= 0) {
     if ($rowY) {
         $fiscal_year_id = (int)$rowY['id'];
     } else {
-        $stmtCreateY = $pdo->prepare("INSERT INTO fiscal_years (year, start_date, end_date, is_current, status) VALUES ('2568', '2024-10-01', '2025-09-30', 1, 'active')");
-        $stmtCreateY->execute();
+        $fyCols = getTableColumns($pdo, 'fiscal_years');
+        $insCols = ["`start_date`", "`end_date`", "`is_current`", "`status`"];
+        $insVals = ['2024-10-01', '2025-09-30', 1, 'active'];
+
+        if (in_array('school_id', $fyCols)) { $insCols[] = "`school_id`"; $insVals[] = 1; }
+        if (in_array('year', $fyCols)) { $insCols[] = "`year`"; $insVals[] = '2568'; }
+        if (in_array('year_be', $fyCols)) { $insCols[] = "`year_be`"; $insVals[] = 2568; }
+        if (in_array('fiscal_year', $fyCols)) { $insCols[] = "`fiscal_year`"; $insVals[] = 2568; }
+
+        $placeholders = array_fill(0, count($insCols), '?');
+        $sqlCreateY = "INSERT INTO `fiscal_years` (" . implode(', ', $insCols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        $stmtCreateY = $pdo->prepare($sqlCreateY);
+        $stmtCreateY->execute($insVals);
         $fiscal_year_id = (int)$pdo->lastInsertId();
     }
 }
